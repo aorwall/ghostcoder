@@ -14,11 +14,11 @@ from ghostcoder.schema import Message, TextItem, FileItem, Stats
 
 
 @pytest.fixture
-def mock_llm():
+def mock_llm_wrapper():
     return Mock(spec=LLMWrapper)
 
 
-def test_two_code_blocks(mock_llm):
+def test_two_code_blocks(mock_llm_wrapper):
     with open("resources/two_code_blocks/response.txt", 'r') as f:
         response = f.read()
 
@@ -32,9 +32,9 @@ def test_two_code_blocks(mock_llm):
             with open(full_path, 'w') as nf:
                 nf.write(content)
 
-        mock_llm.generate.return_value = response, Stats()
+        mock_llm_wrapper.generate.return_value = response, Stats()
 
-        prompt = WriteCodeAction(llm=mock_llm, repository=repository)
+        prompt = WriteCodeAction(llm=mock_llm_wrapper, repository=repository)
 
         response = prompt.execute(Message(
             sender="Human",
@@ -47,7 +47,7 @@ def test_two_code_blocks(mock_llm):
                 assert content == expected
 
 
-def test_no_file_path_and_hallucinations(mock_llm):
+def test_no_file_path_and_hallucinations(mock_llm_wrapper):
     with open("resources/no_file_path_and_hallucinations/response.txt", 'r') as f:
         response = f.read()
 
@@ -61,9 +61,9 @@ def test_no_file_path_and_hallucinations(mock_llm):
             with open(full_path, 'w') as nf:
                 nf.write(content)
 
-        mock_llm.generate.return_value = response, Stats()
+        mock_llm_wrapper.generate.return_value = response, Stats()
 
-        prompt = WriteCodeAction(llm=mock_llm, repository=repository)
+        prompt = WriteCodeAction(llm=mock_llm_wrapper, repository=repository)
 
         response = prompt.execute(Message(
             sender="Human",
@@ -76,8 +76,10 @@ def test_no_file_path_and_hallucinations(mock_llm):
                 assert content == expected
 
 
-def test_square_bracket_fence(mock_llm):
-    verify_execute(mock_llm, "llama_fence", "roman_numerals.py")
+def test_square_bracket_fence(mock_llm_wrapper):
+    verify_execute(mock_llm_wrapper, "llama_fence", "roman_numerals.py")
+
+
 
 
 def verify_execute(mock_llm, test_dir, code_file):

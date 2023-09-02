@@ -12,7 +12,8 @@ When you update or add a new file you must follow the rules below:
 * YOU MUST keep package names and comments.
 * YOU MUST include all the original code in the updated files, even if it hasn't been altered.  
 * YOU SHOULD avoid adding any comments to the new code sections you are proposing.
-* ALL files should be presented in the following format:
+
+ALL files should be presented in the following format:
 Filepath: path/to/file
 ```language
 code 
@@ -21,7 +22,7 @@ code
 
 FEW_SHOT_PYTHON_1 = [
     Message(sender="Human", items=[
-        TextItem(text="Write a function called factorial that takes an integer n as an argument and calculates the factorial of a given integer."),
+        TextItem(text="Update the function factorial to calculate the factorial of a given integer."),
         FileItem(file_path="factorial.py",
                  content="""def factorial(n):
     pass""")
@@ -51,18 +52,12 @@ When updating existing files:
 * YOU MUST replace unchanged lines with a comment. 
 * YOU MUST include the definitions of parent classes and functions.
 
-* ALL files should be presented in the following format:
-Filepath: file_path
+ALL files should be presented in the following format:
+Filepath: path/to/file
 ```language
-code
+code 
 ```
 """
-
-PYTHON_FEW_SHOT_CREATE_EXAMPLE = """
-Human:  
-
-"""
-
 
 NO_PROMPT = """
 """

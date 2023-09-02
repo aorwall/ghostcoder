@@ -30,7 +30,7 @@ Filepath: src/main/java/com/example/demo/DemoApplication.java
 
 def test_updated_file():
     item = UpdatedFileItem(file_path="path/to/updated_file", diff="+ updated file content", content="updated file content")
-    assert item.dict() == {'type': 'updated_file', 'file_path': 'path/to/updated_file', 'content': 'updated file content', 'invalid': False, 'diff': '+ updated file content', 'error': None, 'language': None, 'readonly': False}
+    assert item.dict() == {'type': 'updated_file', 'file_path': 'path/to/updated_file', 'content': 'updated file content', 'invalid': False, 'error': None, 'language': None, 'readonly': False}
 
 
 def test_message():

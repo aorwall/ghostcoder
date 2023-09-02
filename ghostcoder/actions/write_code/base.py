@@ -244,11 +244,9 @@ class WriteCodeAction(BaseAction):
                 else:
                     stats.increment("new_file")
                     print(f"{block.file_path} not found in initial message, assume new file.")
-                    diff = None
 
                 items.append(UpdatedFileItem(
                     file_path=block.file_path,
-                    diff=diff,
                     content=updated_content,
                     error=warning,
                     invalid=invalid
@@ -315,5 +313,5 @@ class WriteCodeAction(BaseAction):
         sys_prompt = self.sys_prompt
 
         if self.few_shot_prompt:
-            sys_prompt += "\n\nExamples:\n" + self.llm.messages_to_prompt(messages=FEW_SHOT_PYTHON_1, few_shot_example=True)
+            sys_prompt += "\n" + self.llm.messages_to_prompt(messages=FEW_SHOT_PYTHON_1, few_shot_example=True)
         return self.llm.generate(sys_prompt, history + messages)

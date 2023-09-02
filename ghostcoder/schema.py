@@ -67,7 +67,6 @@ class FileItem(CodeItem):
 class UpdatedFileItem(FileItem):
     type: str = "updated_file"
     file_path: str = Field(description="file to update or create")
-    diff: Optional[str] = Field(default=None, description="diff of the file change")
     error: Optional[str] = Field(default=None, description="error message")
     invalid: bool = Field(default=False, description="file is invalid")
 
@@ -192,7 +191,6 @@ class Message(ItemHolder):
 
     def to_prompt(self, style: Optional[str] = None) -> str:
         return "\n".join([item.to_prompt(style=style) for item in self.items])
-
 
     def to_history(self):
         item_str = "\n".join([item.to_history() for item in self.items])
