@@ -10,7 +10,7 @@ from langchain.schema.language_model import BaseLanguageModel
 from ghostcoder import FileRepository
 from ghostcoder.actions.write_code.base import  WriteCodeAction
 from ghostcoder.llm import LLMWrapper
-from ghostcoder.llm.alpaca import AlpacaLLMWrapper
+from ghostcoder.llm.alpaca import PhindLLMWrapper
 from ghostcoder.schema import Message, TextItem, FileItem, Stats
 
 
@@ -54,7 +54,7 @@ def test_updated_content_is_invalid(mock_llm):
             response
         ]
 
-        prompt = WriteCodeAction(llm=AlpacaLLMWrapper(mock_llm), repository=repository, auto_mode=True)
+        prompt = WriteCodeAction(llm=PhindLLMWrapper(mock_llm), repository=repository, auto_mode=True)
 
         response = prompt.execute(Message(
             sender="Human",

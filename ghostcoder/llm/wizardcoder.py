@@ -7,14 +7,14 @@ from ghostcoder.llm.base import LLMWrapper
 from ghostcoder.schema import Message, Stats
 
 
-class AlpacaLLMWrapper(LLMWrapper):
+class WizardCoderLLMWrapper(LLMWrapper):
 
     def generate(self, sys_prompt: str, messages: List[Message]) -> (str, Stats):
         starttime = time.time()
 
-        prompt_value = "### System Prompt\n" + sys_prompt + "\n\n"
+        prompt_value = sys_prompt + "\n"
         prompt_value += self.messages_to_prompt(messages)
-        prompt_value += "\n\n### Assistant\n"
+        prompt_value += "\n\n### Response:\n"
 
         retry_decorator = create_base_retry_decorator(error_types=[ValueError], max_retries=5)
 
@@ -36,7 +36,7 @@ class AlpacaLLMWrapper(LLMWrapper):
 
         for message in messages:
             if message.sender == "Human":
-                llm_messages += "\n\n### User Message\n" + message.to_prompt()
+                llm_messages += "\n### Instruction:\n" + message.to_prompt()
             elif message.sender == "AI":
-                llm_messages += "\n\n### Assistant\n" + message.to_prompt()
+                llm_messages += "\n### Response:\n" + message.to_prompt()
         return llm_messages
