@@ -163,6 +163,9 @@ class WriteCodeAction(BaseAction):
         items = []
         for block in blocks:
             if isinstance(block, CodeBlock):
+                # print first 25 chars of block.content and handle if it's shorter
+                logging.info("Received code block: [{}...]".format(block.content[:25]))
+
                 stats.increment("code_block")
                 file_block = self.code_to_file_block(block, file_items, stats)
                 if file_block:
@@ -172,6 +175,8 @@ class WriteCodeAction(BaseAction):
                     continue
 
             if isinstance(block, FileBlock):
+                logging.info("Received file block: [{}]".format(block.file_path))
+
                 stats.increment("file_item")
                 logging.info("Received file block for file: {}".format(block.file_path))
                 original_file_item = get_file_item(file_items, block.file_path)
@@ -252,6 +257,7 @@ class WriteCodeAction(BaseAction):
                     invalid=invalid
                 ))
             else:
+                logging.info("Received text block: [{}...]".format(block[:25]))
                 items.append(TextItem(text=block))
 
         for item in items:

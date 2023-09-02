@@ -10,7 +10,7 @@ from langchain.schema.language_model import BaseLanguageModel
 from ghostcoder import FileRepository
 from ghostcoder.actions.write_code.base import  WriteCodeAction
 from ghostcoder.llm import LLMWrapper
-from ghostcoder.llm.alpaca import PhindLLMWrapper
+from ghostcoder.llm.phind import PhindLLMWrapper
 from ghostcoder.schema import Message, TextItem, FileItem, Stats
 
 
@@ -25,6 +25,10 @@ def mock_llm():
 
 def test_two_code_blocks(mock_llm_wrapper):
     verify_execute(mock_llm_wrapper, "two_code_blocks", "linked_list.py")
+
+
+def test_no_file_path(mock_llm_wrapper):
+    verify_execute(mock_llm_wrapper, "no_file_path", "roman_numerals.py")
 
 
 def test_no_file_path_and_hallucinations(mock_llm_wrapper):
