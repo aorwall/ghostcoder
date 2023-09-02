@@ -4,7 +4,7 @@ from ghostcoder.schema import Message, TextItem, FileItem, UpdatedFileItem
 
 ROLE_PROMPT = """Act as a helpful Senior Developer helping a Human to write code."""
 
-DEFAULT_PROMPT = ROLE_PROMPT + """\n\nYou can both update the existing files and add new ones if needed. 
+DEFAULT_PROMPT = """You can both update the existing files and add new ones if needed. 
 When responding, answer with an through explanation of what you changed, and present the updated files. 
 Please exclude files that have not been updated.   
 

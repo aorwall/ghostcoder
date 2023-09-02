@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from codeblocks import create_parser
 from ghostcoder.actions.base import BaseAction
-from ghostcoder.actions.write_code.prompt import get_implement_prompt, FEW_SHOT_PYTHON_1
+from ghostcoder.actions.write_code.prompt import get_implement_prompt, FEW_SHOT_PYTHON_1, ROLE_PROMPT
 from ghostcoder.filerepository import FileRepository
 from ghostcoder.llm.base import LLMWrapper
 from ghostcoder.schema import Message, FileItem, Stats, TextItem, UpdatedFileItem, CodeItem
@@ -133,6 +133,7 @@ class WriteCodeAction(BaseAction):
         self.repository = repository
         self.auto_mode = auto_mode
         self.tries = tries
+        self.role_prompt = role_prompt
         self.few_shot_prompt = few_shot_prompt
 
     def execute(self, message: Message, message_history: List[Message] = []) -> List[Message]:
@@ -309,7 +310,13 @@ class WriteCodeAction(BaseAction):
         return None
 
     def generate(self, messages: List[Message], history: List[Message] = []) -> (str, Stats):
-        sys_prompt = self.sys_prompt
+        sys_prompt = ""
+        if self.role_prompt:
+            sys_prompt += self.role_prompt + "\n"
+        else:
+            sys_prompt += ROLE_PROMPT + "\n"
+
+        sys_prompt += self.sys_prompt
 
         if self.few_shot_prompt:
             sys_prompt += "\n" + self.llm.messages_to_prompt(messages=FEW_SHOT_PYTHON_1, few_shot_example=True)
