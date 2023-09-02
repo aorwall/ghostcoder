@@ -6,7 +6,7 @@ authors = ["Albert Örwall <albert@a20g.se>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.11,<4.0"
+python = ">=3.10,<4.0"
 codeblocks-gpt = "^0.1.2"
 openai = "^0.27.6"
 langchain = "^0.0.251"
