@@ -48,19 +48,18 @@ class Exllama(LLM):
 
             config = ExLlamaConfig(model_config_path)
             config.model_path = model_path
-
+            config.max_seq_len = values["max_seq_len"]
+            config.max_input_len = values["max_input_len"]
+            config.compress_pos_emb = values["compress_pos_emb"]
             model = ExLlama(config)
+
             tokenizer = ExLlamaTokenizer(tokenizer_path)
 
             cache = ExLlamaCache(model)
             generator = ExLlamaGenerator(model, tokenizer, cache)
-
             generator.settings.temperature = values["temperature"]
             generator.settings.top_p = values["top_p"]
             generator.settings.top_k = values["top_k"]
-            generator.settings.max_seq_len = values["max_seq_len"]
-            generator.settings.max_input_len = values["max_input_len"]
-            generator.settings.compress_pos_emb = values["compress_pos_emb"]
 
             values["client"] = generator
         except Exception as e:
