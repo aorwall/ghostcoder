@@ -3,18 +3,11 @@ from __future__ import annotations
 import glob
 import logging
 import os
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Union
+from typing import Any, Dict,  List, Optional
 
 from langchain.callbacks.manager import CallbackManagerForLLMRun
 from langchain.llms.base import LLM
-from langchain.pydantic_v1 import Field, root_validator
-from langchain.schema.output import GenerationChunk
-from langchain.utils import get_pydantic_field_names
-from langchain.utils.utils import build_extra_kwargs
-
-if TYPE_CHECKING:
-    from llama_cpp import LlamaGrammar
+from pydantic import Field, root_validator
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +15,6 @@ logger = logging.getLogger(__name__)
 class Exllama(LLM):
     client: Any  #: :meta private:
     model_directory: str
-
-    max_seq_len: int = Field(2048, alias="max_seq_len")
 
     temperature: float = Field(0.95, alias="temperature")
     top_k: int = Field(20, alias="top_k")
