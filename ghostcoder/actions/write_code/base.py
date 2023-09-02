@@ -182,7 +182,6 @@ class WriteCodeAction(BaseAction):
                 parser = None
                 try:
                     parser = create_parser(block.language)
-
                 except Exception as e:
                     logging.warning(f"Could not create parser for language {block.language}: {e}")
 
@@ -201,10 +200,10 @@ class WriteCodeAction(BaseAction):
                     if error_blocks:
                         stats.increment("files_with_errors")
                         logging.info("The updated file {} has errors. ".format(block.file_path))
-                        retry_inputs.append(TextItem(text="You returned a file with the following invalid code blocks:"))
+                        retry_inputs.append(TextItem(text="You returned a file with syntax errors. Find them and correct them."))
                         invalid = True
                         for error_block in error_blocks:
-                            retry_inputs.append(CodeItem(language=block.language, content=error_block.to_string(), file_path=block.file_path))
+                            retry_inputs.append(FileItem(language=block.language, content=error_block.to_string(), file_path=block.file_path))
                     elif original_file_item:
                         original_block = parser.parse(original_file_item.content)
                         gpt_tweaks = original_block.merge(updated_block, first_level=True)
@@ -220,10 +219,10 @@ class WriteCodeAction(BaseAction):
                         if error_blocks:
                             stats.increment("merged_files_with_errors")
                             logging.info("The merged file {} has errors..".format(block.file_path))
-                            retry_inputs.append(TextItem(text="The merged contents from your file resulted in invalid code blocks: "))
+                            retry_inputs.append(TextItem(text="You returned a file with syntax errors. Find them and correct them."))
                             invalid = True
                             for error_block in error_blocks:
-                                retry_inputs.append(CodeItem(language=block.language, content=error_block.to_string(),file_path=block.file_path))
+                                retry_inputs.append(FileItem(language=block.language, content=error_block.to_string(), file_path=block.file_path))
 
                 if not retry_inputs and not is_complete(updated_content):
                     stats.increment("not_complete_file")

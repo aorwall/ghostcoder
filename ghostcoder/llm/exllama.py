@@ -67,7 +67,7 @@ class Exllama(LLM):
             values["tokenizer"] = tokenizer
         except Exception as e:
             raise ValueError(
-                f"Could not load Llama model from path: {model_path}. "
+                f"Could not load Llama model from path: {model_directory}. "
                 f"Received error {e}"
             )
 

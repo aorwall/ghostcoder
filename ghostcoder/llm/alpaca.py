@@ -36,7 +36,7 @@ class AlpacaLLMWrapper(LLMWrapper):
 
         for message in messages:
             if message.sender == "Human":
-                llm_messages += "\n\n### User Message\n" + str(message)
+                llm_messages += "\n\n### User Message\n" + message.to_prompt()
             elif message.sender == "AI":
-                llm_messages += "\n\n### Assistant\n" + str(message)
+                llm_messages += "\n\n### Assistant\n" + message.to_prompt()
         return llm_messages
