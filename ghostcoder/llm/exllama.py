@@ -13,7 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 class Exllama(LLM):
-    client: Any  #: :meta private:
+    llm: Any  #: :meta private:
+    tokenizer: Any  #: :meta private:
+
     model_directory: str
 
     temperature: float = Field(0.95, alias="temperature")
@@ -61,7 +63,8 @@ class Exllama(LLM):
             generator.settings.top_p = values["top_p"]
             generator.settings.top_k = values["top_k"]
 
-            values["client"] = generator
+            values["llm"] = generator
+            values["tokenizer"] = tokenizer
         except Exception as e:
             raise ValueError(
                 f"Could not load Llama model from path: {model_path}. "
@@ -114,9 +117,38 @@ class Exllama(LLM):
                 llm("This is a prompt.")
         """
 
-        result = self.client.generate_simple(prompt, max_new_tokens=self.max_new_tokens)
-        return result
+        ids = self.tokenizer.encode(prompt)
+        remaining_tokens = self.max_seq_len - len(ids[0]) - 1
+        if remaining_tokens <= 1:
+            raise ValueError(
+                f"Prompt is too long. "
+                f"Please provide a prompt with fewer than {self.max_seq_len} tokens."
+            )
+        self.llm.gen_begin(ids)
+        self.llm.begin_beam_search()
+        num_res_tokens = 0
+        res_line = ""
+        out_text = ""
+        max_response_tokens = self.max_new_tokens
+        if max_response_tokens > remaining_tokens:
+            max_response_tokens = remaining_tokens
+        for i in range(max_response_tokens):
+            gen_token = self.llm.beam_search()
+
+            if gen_token.item() == self.tokenizer.eos_token_id:
+                break
+
+            num_res_tokens += 1
+            text = self.tokenizer.decode(self.llm.sequence_actual[:, -num_res_tokens:][0])
+            new_text = text[len(res_line):]
+
+            res_line += new_text
+            out_text += new_text
+
+        self.llm.end_beam_search()
+
+        return out_text.strip()
 
     def get_num_tokens(self, text: str) -> int:
-        tokenized_text = self.client.tokenizer.num_tokens(text.encode("utf-8"))
+        tokenized_text = self.llm.tokenizer.num_tokens(text.encode("utf-8"))
         return len(tokenized_text)
