@@ -75,7 +75,7 @@ class UpdatedFileItem(FileItem):
             self.language = language_by_filename(self.file_path)
 
     def to_prompt(self, style: Optional[str] = None):
-        return f"I updated file with Filepath: {self.file_path}\n{super().to_prompt(style=style)}"
+        return self.to_prompt(style=style)
 
     def __str__(self) -> str:
         return self.to_prompt()
