@@ -6,7 +6,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from codeblocks import create_parser
+from codeblocks_gpt import create_parser
 from ghostcoder.actions.base import BaseAction
 from ghostcoder.actions.write_code.prompt import get_implement_prompt, FEW_SHOT_PYTHON_1, ROLE_PROMPT
 from ghostcoder.filerepository import FileRepository
