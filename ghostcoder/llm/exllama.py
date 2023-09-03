@@ -13,8 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 class Exllama(LLM):
-    llm: Any  #: :meta private:
+    generator: Any  #: :meta private:
     tokenizer: Any  #: :meta private:
+    model: Any   #: :meta private:
 
     model_directory: str
 
@@ -62,8 +63,8 @@ class Exllama(LLM):
             generator.settings.temperature = values["temperature"]
             generator.settings.top_p = values["top_p"]
             generator.settings.top_k = values["top_k"]
-
-            values["llm"] = generator
+            values["model"] = model
+            values["generator"] = generator
             values["tokenizer"] = tokenizer
         except Exception as e:
             raise ValueError(
@@ -117,38 +118,31 @@ class Exllama(LLM):
                 llm("This is a prompt.")
         """
 
-        ids = self.tokenizer.encode(prompt)
-        remaining_tokens = self.max_seq_len - len(ids[0]) - 1
-        if remaining_tokens <= 1:
-            raise ValueError(
-                f"Prompt is too long. "
-                f"Please provide a prompt with fewer than {self.max_seq_len} tokens."
-            )
-        self.llm.gen_begin(ids)
-        self.llm.begin_beam_search()
-        num_res_tokens = 0
-        res_line = ""
-        out_text = ""
-        max_response_tokens = self.max_new_tokens
-        if max_response_tokens > remaining_tokens:
-            max_response_tokens = remaining_tokens
-        for i in range(max_response_tokens):
-            gen_token = self.llm.beam_search()
+        ids = self.tokenizer.encode(prompt, max_seq_len=self.model.config.max_seq_len)
+        ids = ids[:, -self.max_input_len:]
 
-            if gen_token.item() == self.tokenizer.eos_token_id:
+        max_new_tokens = self.max_new_tokens
+
+        self.generator.gen_begin_reuse(ids)
+        initial_len = self.generator.sequence[0].shape[0]
+        has_leading_space = False
+
+        out_text = ""
+        for i in range(max_new_tokens):
+            token = self.generator.gen_single_token()
+            if i == 0 and self.generator.tokenizer.tokenizer.IdToPiece(int(token)).startswith('▁'):
+                has_leading_space = True
+
+            decoded_text = self.generator.tokenizer.decode(self.generator.sequence[0][initial_len:])
+            if has_leading_space:
+                decoded_text = ' ' + decoded_text
+
+            out_text += decoded_text
+            if token.item() == self.generator.tokenizer.eos_token_id:
                 break
 
-            num_res_tokens += 1
-            text = self.tokenizer.decode(self.llm.sequence_actual[:, -num_res_tokens:][0])
-            new_text = text[len(res_line):]
-
-            res_line += new_text
-            out_text += new_text
-
-        self.llm.end_beam_search()
-
-        return out_text.strip()
+        return out_text
 
     def get_num_tokens(self, text: str) -> int:
-        tokenized_text = self.llm.tokenizer.num_tokens(text.encode("utf-8"))
+        tokenized_text = self.generator.tokenizer.num_tokens(text.encode("utf-8"))
         return len(tokenized_text)

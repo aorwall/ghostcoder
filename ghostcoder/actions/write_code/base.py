@@ -63,6 +63,11 @@ def extract_response_parts(response: str) -> List[Union[str, FileBlock]]:
 
     combined_parts = []
 
+    crlf_count = response.count('\r\n')
+    if crlf_count > 0:
+        logging.info(f"Found {crlf_count} CRLF line breaks in response, replacing with LF")
+        response = response.replace('\r\n', '\n').replace('\r', '\n')
+
     pattern = re.compile(r'(Filepath:\s*(.*?)\n)?\[(.*?)\]\n(.*?)\n\[/\3\]|(Filepath:\s*(.*?)\n)?```(\w+)?\n(.*?)\n```', re.DOTALL)
 
     last_end = 0
@@ -163,9 +168,7 @@ class WriteCodeAction(BaseAction):
         items = []
         for block in blocks:
             if isinstance(block, CodeBlock):
-                # print first 25 chars of block.content and handle if it's shorter
-                logging.info("Received code block: [{}...]".format(block.content[:25]))
-
+                logging.info("Received code block: [{}...]".format(block.content[:25].replace("\n", "\\n")))
                 stats.increment("code_block")
                 file_block = self.code_to_file_block(block, file_items, stats)
                 if file_block:
@@ -176,9 +179,7 @@ class WriteCodeAction(BaseAction):
 
             if isinstance(block, FileBlock):
                 logging.info("Received file block: [{}]".format(block.file_path))
-
                 stats.increment("file_item")
-                logging.info("Received file block for file: {}".format(block.file_path))
                 original_file_item = get_file_item(file_items, block.file_path)
 
                 warning = None
@@ -257,7 +258,7 @@ class WriteCodeAction(BaseAction):
                     invalid=invalid
                 ))
             else:
-                logging.info("Received text block: [{}...]".format(block[:25]))
+                logging.info("Received text block: [{}...]".format(block[:25].replace("\n", "\\n")))
                 items.append(TextItem(text=block))
 
         for item in items:
