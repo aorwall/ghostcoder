@@ -290,15 +290,13 @@ class WriteCodeAction(BaseAction):
         """Tries to find a file item that matches the code block."""
 
         for file_item in file_items:
-            language = language_by_filename(file_item.file_path)
-
-            if block.language and block.language != language:
+            if block.language and block.language != file_item.language:
                 logging.info(
-                    f"Language in block {block.language} does not match file path {file_item.file_path} {language}")
+                    f"Language in block {block.language} does not match file path {file_item.file_path} {file_item.language}")
                 continue
 
             try:
-                parser = create_parser(language)
+                parser = create_parser(file_item.language)
                 original_block = parser.parse(file_item.content)
                 updated_block = parser.parse(block.content)
 
@@ -309,10 +307,10 @@ class WriteCodeAction(BaseAction):
                     return FileBlock(
                         file_path=file_items[0].file_path,
                         content=block.content,
-                        language=block.language if block.language else language)
+                        language=file_item.language)
             except Exception as e:
                 logging.warning(
-                    f"Could not parse file with {language} or code block with language {block.language}: {e}")
+                    f"Could not parse file with {file_item.language} or code block with language {block.language}: {e}")
 
         return None
 
