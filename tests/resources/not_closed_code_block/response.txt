@@ -1,0 +1,33 @@
+Here's the modified code with the required changes:
+
+```python
+class BufferFullException(BufferError):
+    """Exception raised when CircularBuffer is full.
+    message: explanation of the error.
+    """
+    def __init__(self, message="Circular buffer is full."):
+        super().__init__(message)
+
+
+class BufferEmptyException(BufferError):
+    """Exception raised when CircularBuffer is empty.
+    message: explanation of the error.
+    """
+    def __init__(self, message="Circular buffer is empty."):
+        super().__init__(message)
+
+
+class CircularBuffer:
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.buffer = []
+        self.head = -1
+        self.tail = -1
+
+    
+    def read(self):
+        if self.is_empty():
+            raise BufferEmptyException()
+        else:
+            return self.buffer[self.head]
+---

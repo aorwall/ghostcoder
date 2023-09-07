@@ -3,7 +3,7 @@ from typing import List, Union, Optional, Dict, Any
 
 from langchain.callbacks.openai_info import get_openai_token_cost_for_model, MODEL_COST_PER_1K_TOKENS
 from marshmallow import ValidationError
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, root_validator
 
 from ghostcoder.utils import language_by_filename
 
@@ -40,9 +40,17 @@ class CodeItem(Item):
             return f"[{self.language.upper()}]\n{self.content}\n[/{self.language.upper()}]\n"
 
         if self.language:
-            return f"```{self.language}\n{self.content}\n```\n"
+            return f"```{self.language}\n{self.content}\n```"
 
-        return f"```\n{self.content}\n```\n"
+        return f"```\n{self.content}\n```"
+
+
+class VerificationFailureItem(Item):
+    type: str = "verification_failure"
+    output: str = Field(description="Output")
+    test_method: Optional[str] = Field(default=None, description="Test method")
+    test_class: Optional[str] = Field(default=None, description="Test class")
+    test_file: Optional[str] = Field(default=None, description="Test file")
 
 
 class FileItem(CodeItem):
@@ -50,15 +58,23 @@ class FileItem(CodeItem):
     file_path: str = Field(default="", description="Path to file")
     readonly: bool = Field(default=False, description="Is the file readonly")
 
-    def __post_init__(self):
-        if self.language is None:
-            self.language = language_by_filename(self.file_path)
+    @root_validator(pre=True)
+    def set_language(cls, values):
+        file_path = values.get('file_path')
+        language = values.get('language')
+        if file_path and not language:
+            values['language'] = language_by_filename(file_path)
+        return values
 
     def __str__(self) -> str:
         return self.to_prompt()
 
     def to_prompt(self, style: Optional[str] = None):
-        return f"Filepath: {self.file_path}\n{super().to_prompt(style=style)}"
+        readonly_str = ""
+        if self.readonly:
+            readonly_str = " (readonly)"
+
+        return f"Filepath: {self.file_path}{readonly_str}\n{super().to_prompt(style=style)}"
 
     def to_history(self) -> str:
         return f"Filepath: {self.file_path}"
@@ -69,10 +85,6 @@ class UpdatedFileItem(FileItem):
     file_path: str = Field(description="file to update or create")
     error: Optional[str] = Field(default=None, description="error message")
     invalid: bool = Field(default=False, description="file is invalid")
-
-    def __post_init__(self):
-        if self.language is None:
-            self.language = language_by_filename(self.file_path)
 
     def to_prompt(self, style: Optional[str] = None):
         return super().to_prompt(style=style)
@@ -190,7 +202,7 @@ class Message(ItemHolder):
         return "\n".join([str(item) for item in self.items])
 
     def to_prompt(self, style: Optional[str] = None) -> str:
-        return "\n".join([item.to_prompt(style=style) for item in self.items])
+        return "\n\n".join([item.to_prompt(style=style) for item in self.items])
 
     def to_history(self):
         item_str = "\n".join([item.to_history() for item in self.items])

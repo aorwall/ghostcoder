@@ -1,0 +1,110 @@
+method: on_llm_end [2023-09-03 15:56:12]
+llm_output: null
+prompt:
+Solution:
+
+We can create two classes `MeteredFile` and `MeteredSocket` which inherit from their respective base classes (`io.BufferedRandom` and `socket`) and override their methods to track the required metrics.
+
+
+For `MeteredFile`, we can use composition to wrap an instance of `io.BufferedRandom` and delegate most of its functionality to it while also keeping track of the number of reads and writes and the amount of data transferred. We can do this by overriding the `__init__()` method to store the wrapped object and updating counters in the `read()`, `write()` and other relevant methods.
+
+
+For `MeteredSocket`, we can use delegation to forward calls to the underlying socket object and keep track of the number of bytes sent and received during these calls. We can achieve this by storing the reference to the socket object passed in the constructor and intercepting calls to `recv()` and `send()`.
+
+
+Here's the implementation:
+
+```python
+import io
+import socket
+
+
+class MeteredFile(io.BufferedRandom):
+    """Track bytes read/written and count read/write ops."""
+
+    def __init__(self, fd, mode='rb', buffering=-1, encoding=None, newline=None, closefd=True):
+        super().__init__(fd)
+        self._wrapped = open(fd, mode=mode, buffering=buffering, encoding=encoding, newline=newline, closefd=closefd)
+        self._read_bytes = 0
+        self._read_ops = 0
+        self._write_bytes = 0
+        self._write_ops = 0
+
+    def __enter__(self):
+        return self._wrapped.__enter__()
+
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return self._wrapped.__exit__(exc_type, exc_val, exc_tb)
+
+
+    def __iter__(self):
+        return iter(self._wrapped)
+
+
+    def __next__(self):
+        chunk = next(self._wrapped)
+        self._read_bytes += len(chunk)
+        self._read_ops += 1
+        return chunk
+
+
+    def read(self, size=-1):
+        chunk = self._wrapped.read(size)
+        self._read_bytes += len(chunk)
+        self._read_ops += 1
+        return chunk
+
+    @property
+    def read_bytes(self):
+        return self._read_bytes
+
+
+    @property
+    def read_ops(self):
+        return self._read_ops
+
+
+    def write(self, b):
+        written = self._wrapped.write(b)
+        self._write_bytes += written
+        self._write_ops += 1
+        return written
+
+
+    @property
+    def write_bytes(self):
+        return self._write_bytes
+
+
+    @property
+    def write_ops(self):
+        return self._write_ops
+
+
+
+class MeteredSocket:
+    """Track bytes sent/received and count recv/send ops."""
+
+    def __init__(self, sock):
+        self._sock = sock
+        self._recv_bytes = 0
+        self._recv_ops = 0
+        self._send_bytes = 0
+        self._send_ops = 0
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._sock.__exit__(exc_type, exc_val, exc_tb)
+
+    def recv(self, bufsize, flags=0):
+        chunk = self._sock.recv(bufsize, flags)
+        self._recv_bytes += len(chunk)
+        self._recv_ops += 1
+        return chunk
+
+    @property
+    def recv_bytes(self):
+        return self._recv_bytes

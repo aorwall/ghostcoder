@@ -7,9 +7,9 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<4.0"
-codeblocks-gpt = "^0.1.2"
-openai = "^0.27.6"
-langchain = "^0.0.251"
+codeblocks-gpt = "^0.0.1"
+openai = "^0.28.0"
+langchain = "^0.0.281"
 pydantic = "^1"
 pytest = "^7.3.1"
 tiktoken = "^0.4.0"

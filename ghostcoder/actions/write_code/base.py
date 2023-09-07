@@ -1,14 +1,15 @@
 import difflib
 import logging
 import re
+from pathlib import Path
 from typing import List, Union
 from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from codeblocks_gpt import create_parser
+from codeblocks import create_parser, CodeBlockType
 from ghostcoder.actions.base import BaseAction
-from ghostcoder.actions.write_code.prompt import get_implement_prompt, FEW_SHOT_PYTHON_1, ROLE_PROMPT
+from ghostcoder.actions.write_code.prompt import get_implement_prompt, FEW_SHOT_PYTHON_1, ROLE_PROMPT, FEW_SHOTS_PYTHON
 from ghostcoder.filerepository import FileRepository
 from ghostcoder.llm.base import LLMWrapper
 from ghostcoder.schema import Message, FileItem, Stats, TextItem, UpdatedFileItem, CodeItem
@@ -142,16 +143,18 @@ class WriteCodeAction(BaseAction):
         self.few_shot_prompt = few_shot_prompt
 
     def execute(self, message: Message, message_history: List[Message] = []) -> List[Message]:
-        logging.info("Execute the Write Code Action")
+        logging.info("execute()")
         file_items = message.find_items_by_type(item_type="file")
         for file_item in file_items:
             if not file_item.content and self.repository:
-                logging.info(f"Get current file content for {file_item.file_path}")
+                logging.debug(f"execute() Get current file content for {file_item.file_path}")
                 content = self.repository.get_file_content(file_path=file_item.file_path)
                 if content:
                     file_item.content = content
                 else:
-                    logging.info(f"Could not find file {file_item.file_path} in repository")
+                    logging.debug(f"execute() Could not find file {file_item.file_path} in repository, "
+                                 f"will assume it's a request to create a new file")
+                    file_item.content = ""
 
         return self._execute(messages=[message], message_history=message_history, retry=0)
 
@@ -168,7 +171,7 @@ class WriteCodeAction(BaseAction):
         items = []
         for block in blocks:
             if isinstance(block, CodeBlock):
-                logging.info("Received code block: [{}...]".format(block.content[:25].replace("\n", "\\n")))
+                logging.debug("execute() Received code block: [{}...]".format(block.content[:25].replace("\n", "\\n")))
                 stats.increment("code_block")
                 file_block = self.code_to_file_block(block, file_items, stats)
                 if file_block:
@@ -178,7 +181,7 @@ class WriteCodeAction(BaseAction):
                     continue
 
             if isinstance(block, FileBlock):
-                logging.info("Received file block: [{}]".format(block.file_path))
+                logging.debug("execute() Received file block: [{}]".format(block.file_path))
                 stats.increment("file_item")
                 original_file_item = get_file_item(file_items, block.file_path)
 
@@ -187,18 +190,18 @@ class WriteCodeAction(BaseAction):
                 invalid = False
 
                 parser = None
-                try:
-                    parser = create_parser(block.language)
-                except Exception as e:
-                    logging.warning(f"Could not create parser for language {block.language}: {e}")
+                if block.language:
+                    try:
+                        parser = create_parser(block.language)
+                    except Exception as e:
+                        logging.warning(f"execute() Could not create parser for language {block.language}: {e}")
 
                 if parser:
                     try:
                         updated_block = parser.parse(updated_content)
                     except Exception as e:
-                        logging.warning(f"Could not parse updated content: {e}")
+                        logging.warning(f"execute() Could not parse updated  in {block.file_path}: {e}")
                         stats.increment("invalid_code_block")
-                        logging.info("The updated file {} has errors. ".format(block.file_path))
                         retry_input = f"You returned a file with the following invalid code blocks: \n" + updated_content
                         retry_inputs.append(TextItem(text=retry_input))
                         continue
@@ -206,12 +209,12 @@ class WriteCodeAction(BaseAction):
                     error_blocks = updated_block.find_errors()
                     if error_blocks:
                         stats.increment("files_with_errors")
-                        logging.info("The updated file {} has errors. ".format(block.file_path))
+                        logging.info("execute() The updated file {} has errors. ".format(block.file_path))
                         retry_inputs.append(TextItem(text="You returned a file with syntax errors. Find them and correct them."))
                         invalid = True
                         for error_block in error_blocks:
                             retry_inputs.append(FileItem(language=block.language, content=error_block.to_string(), file_path=block.file_path))
-                    elif original_file_item:
+                    elif original_file_item and not original_file_item.readonly:
                         original_block = parser.parse(original_file_item.content)
                         gpt_tweaks = original_block.merge(updated_block, first_level=True)
 
@@ -225,13 +228,14 @@ class WriteCodeAction(BaseAction):
                         error_blocks = merged_block.find_errors()
                         if error_blocks:
                             stats.increment("merged_files_with_errors")
-                            logging.info("The merged file {} has errors..".format(block.file_path))
+                            logging.info("execute() The merged file {} has errors..".format(block.file_path))
                             retry_inputs.append(TextItem(text="You returned a file with syntax errors. Find them and correct them."))
                             invalid = True
                             for error_block in error_blocks:
                                 retry_inputs.append(FileItem(language=block.language, content=error_block.to_string(), file_path=block.file_path))
 
                 if not retry_inputs and not is_complete(updated_content):
+                    logging.info(f"execute() The content in block [{block.file_path}] is not complete, will retry")
                     stats.increment("not_complete_file")
                     retry_inputs.append(TextItem(text=f"Return all code from the original code in the update file {block.file_path}."))
                     invalid = True
@@ -241,15 +245,22 @@ class WriteCodeAction(BaseAction):
                     if not diff:
                         invalid = True
                         stats.increment("no_change")
-                    original_file_item.content = updated_content
+
+                    if original_file_item.readonly:
+                        invalid = True
+                        stats.increment("updated_readonly_file")
+
+                    if not invalid:
+                        original_file_item.content = updated_content
                 elif self.repository.get_file_content(block.file_path):
                     # TODO: Check in context if the file might exist in earlier messages
-                    print(f"{block.file_path} not found in initial message but exists in repo, assume hallucination.")
+                    logging.info(f"execute() {block.file_path} not found in initial message but exists in repo, will assume"
+                                 f"that it's a hallucination and ignore the file.")
                     stats.increment("hallucinated_file")
                     continue
                 else:
                     stats.increment("new_file")
-                    print(f"{block.file_path} not found in initial message, assume new file.")
+                    logging.debug(f"execute() {block.file_path} not found in initial message, assume new file.")
 
                 items.append(UpdatedFileItem(
                     file_path=block.file_path,
@@ -258,8 +269,13 @@ class WriteCodeAction(BaseAction):
                     invalid=invalid
                 ))
             else:
-                logging.info("Received text block: [{}...]".format(block[:25].replace("\n", "\\n")))
+                logging.debug("execute() Received text block: [{}...]".format(block[:25].replace("\n", "\\n")))
                 items.append(TextItem(text=block))
+                if self.has_not_closed_code_blocks(block):
+                    stats.increment("not_closed_code_block")
+                    retry_inputs.append(
+                        TextItem(text="You responded with a incomplete code block. "
+                                      "Please provide the contents of the whole file in a code block closed with ```."))
 
         for item in items:
             if item.type == "updated_file" and not item.invalid and self.repository:
@@ -290,9 +306,12 @@ class WriteCodeAction(BaseAction):
         """Tries to find a file item that matches the code block."""
 
         for file_item in file_items:
+            if not file_item.language:
+                continue
+
             if block.language and block.language != file_item.language:
-                logging.info(
-                    f"Language in block {block.language} does not match file path {file_item.file_path} {file_item.language}")
+                logging.debug(
+                    f"execute() Language in block [{block.language}] does not match language [{file_item.language}] file path {file_item.file_path}")
                 continue
 
             try:
@@ -300,12 +319,15 @@ class WriteCodeAction(BaseAction):
                 original_block = parser.parse(file_item.content)
                 updated_block = parser.parse(block.content)
 
-                if original_block.has_any_similarity(updated_block):
-                    logging.info(f"Code block with no file path has similarities to {file_items[0].file_path}, "
-                                 f"will assume it's the updated file'.")
+                matching_blocks = original_block.get_matching_blocks(updated_block)
+                if any(matching_block for matching_block in matching_blocks
+                       if matching_block.type in [CodeBlockType.FUNCTION, CodeBlockType.CLASS]):
+                    matching_content_str = "".join([f"\n- {block.content.strip()}" for block in matching_blocks])
+                    logging.info(f"execute() Code block has similarities to {file_item.file_path}, will assume it's the "
+                                 f"updated file.\nSimilarities:{matching_content_str})")
                     stats.increment("guess_file_item")
                     return FileBlock(
-                        file_path=file_items[0].file_path,
+                        file_path=file_item.file_path,
                         content=block.content,
                         language=file_item.language)
             except Exception as e:
@@ -313,6 +335,19 @@ class WriteCodeAction(BaseAction):
                     f"Could not parse file with {file_item.language} or code block with language {block.language}: {e}")
 
         return None
+
+    def has_not_closed_code_blocks(self, text):
+        lines = text.split("\n")
+        code_block_count = 0  # Counting the number of code block markers (```)
+
+        for index, line in enumerate(lines):
+            if "```" in line:
+                code_block_count += 1
+
+        if code_block_count % 2 == 1:
+            return True
+
+        return False
 
     def generate(self, messages: List[Message], history: List[Message] = []) -> (str, Stats):
         sys_prompt = ""
@@ -324,5 +359,5 @@ class WriteCodeAction(BaseAction):
         sys_prompt += self.sys_prompt
 
         if self.few_shot_prompt:
-            sys_prompt += "\n" + self.llm.messages_to_prompt(messages=FEW_SHOT_PYTHON_1, few_shot_example=True)
+            sys_prompt += "\n" + self.llm.messages_to_prompt(messages=FEW_SHOTS_PYTHON, few_shot_example=True)
         return self.llm.generate(sys_prompt, history + messages)

@@ -1,0 +1,45 @@
+Filepath: tournament.py
+
+```python
+def tally(rows):
+    results = {}
+    for row in rows:
+        home_team, away_team, outcome = row.split(';')
+        if home_team not in results:
+            results[home_team] = {'MP': 0, 'W': 0, 'D': 0, 'L': 0, 'P': 0}
+        if away_team not in results:
+            results[away_team] = {'MP': 0, 'W': 0, 'D': 0, 'L': 0, 'P': 0}
+        
+        if outcome == 'win':
+            results[home_team]['MP'] += 1
+            results[home_team]['W'] += 1
+            results[home_team]['P'] += 3
+            results[away_team]['MP'] += 1
+            results[away_team]['L'] += 1
+        elif outcome == 'loss':
+            results[home_team]['MP'] += 1
+            results[home_team]['L'] += 1
+            results[away_team]['MP'] += 1
+            results[away_team]['W'] += 1
+            results[away_team]['P'] += 3
+        else: # draw
+            results[home_team]['MP'] += 1
+            results[home_team]['D'] += 1
+            results[home_team]['P'] += 1
+            results[away_team]['MP'] += 1
+            results[away_team]['D'] += 1
+            results[away_team]['P'] += 1
+    
+    sorted_results = sorted(results.items(), key=lambda x: (-x[1]['P'], x[0]) )
+    print("Team                           | MP |  W |  D |  L |  P")
+    for team, data in sorted_results:
+        print(f"{team:{25}s} | {data['MP']:2d} | {data['W']:2d} | {data['D']:2d} | {data['L']:2d} | {data['P']:2d}")
+```
+
+Explanation:
+- We create an empty dictionary `results` to store the scores of each team.
+- For each row in the input file, we split it into three parts: home team name, away team name and outcome (win/loss/draw).
+- If either team is not present in the `results` dictionary, we add them with initial values of 0 for all keys.
+- Based on the outcome, we update the count of matches played (`MP`), wins (`W`), draws (`D`) and losses (`L`) as well as points (`P`).
+- Finally, we sort the teams by their points and alphabetically if there's a tie, then print out the table using string formatting.
+---

@@ -1,0 +1,20 @@
+The code in the `RawMaterial` class needs to be updated to fix the failing tests.
+
+Here are the changes that need to be made:
+
+1. In the `precise_cut` method, the conditions for checking if the cut dimensions are valid and if they exceed the material dimensions are incorrect. The conditions should check if the cut dimensions are greater than or equal to zero and if they are less than or equal to the corresponding dimensions of the material. The updated conditions should be:
+```python
+if cut_length <= 0 or cut_width <= 0 or cut_height <= 0:
+    return "Invalid cut. Dimensions cannot be negative or zero."
+
+if cut_length > self.length or cut_width > self.width or cut_height > self.height:
+    return "Invalid cut. Cut dimensions exceed material dimensions."
+```
+2. In the `precise_cut` method, the return message after a successful cut should be updated to include the new dimensions. The updated return statement should be:
+```python
+return f"Cut successful. New dimensions are: {self.length}, {self.width}, {self.height}"
+```
+3. In the `get_current_size` method, the return statement should be updated to return a tuple of the current dimensions instead of a formatted string. The updated return statement should be:
+```python
+return self.length, self.width, self.height
+```
