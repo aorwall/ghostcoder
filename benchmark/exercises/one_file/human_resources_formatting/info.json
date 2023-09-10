@@ -1,0 +1,55 @@
+{
+  "instruction_format": "tech-details",
+  "exercise": "human_resources_formatting",
+  "benchmark_results": [
+    {
+      "llm_name": "gpt-3.5-turbo",
+      "llm_params": {
+        "temperature": 0.0
+      },
+      "success": false,
+      "retries": 2,
+      "test_failures": [
+        "test_missing_keys"
+      ]
+    },
+    {
+      "llm_name": "gpt-3.5-turbo",
+      "llm_params": {
+        "temperature": 0.2
+      },
+      "success": true,
+      "retries": 2
+    },
+    {
+      "llm_name": "gpt-3.5-turbo",
+      "llm_params": {
+        "temperature": 0.4
+      },
+      "success": true,
+      "retries": 2
+    },
+    {
+      "llm_name": "gpt-3.5-turbo",
+      "llm_params": {
+        "temperature": 0.6000000000000001
+      },
+      "success": false,
+      "retries": 2,
+      "test_failures": [
+        "test_missing_keys"
+      ]
+    },
+    {
+      "llm_name": "gpt-3.5-turbo",
+      "llm_params": {
+        "temperature": 0.8
+      },
+      "success": false,
+      "retries": 2,
+      "test_failures": [
+        "test_missing_keys"
+      ]
+    }
+  ]
+}

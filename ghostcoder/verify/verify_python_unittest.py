@@ -1,3 +1,4 @@
+import glob
 import logging
 import os
 import re
@@ -88,6 +89,11 @@ class PythonUnittestVerifier(Verifier):
         header_pattern = r'(FAIL|ERROR): ([^\s]+) \(([^.]+)\.([^\.]+)\.([^\)]+)\)'
         body_pattern = r'[\s\S]+?.*File "([^"]+)", (.*)'
 
+        file_pattern = re.compile(r'File "([^"]+)", ')
+
+
+        test_files = glob.glob(str(self.current_dir) + "/" + self.test_file_pattern, recursive=True)
+
         splitted = section.split("----------------------------------------------------------------------")
         if len(splitted) >= 2:
             if "unittest.loader" in splitted[0]:
@@ -95,9 +101,16 @@ class PythonUnittestVerifier(Verifier):
             else:
                 test_load_fail = False
 
+            file_path = None
+            all_matches = file_pattern.findall(splitted[1])
+            for match in all_matches:
+                if match in test_files:
+                    file_path = match
+                    break
+
             header_match = re.search(header_pattern, splitted[0], re.DOTALL)
             body_match = re.search(body_pattern, splitted[1], re.DOTALL)
-            if header_match and body_match:
+            if header_match:
                 if test_load_fail:
                     test_result, test_method, _, _, _ = header_match.groups()
                     traceback = splitted[1]
@@ -105,8 +118,14 @@ class PythonUnittestVerifier(Verifier):
                     test_file = None
                 else:
                     test_result, test_method, module, test_class, _ = header_match.groups()
-                    file_path, traceback = body_match.groups()
+
+                    if file_path:
+                        traceback = splitted[1].split(file_path)[1][2:]
+                    else:
+                        file_path, traceback = body_match.groups()
+
                     test_file = file_path.replace(str(self.current_dir) + "/", "")
+                traceback = traceback.replace(str(self.current_dir) + "/", "")
 
                 return VerificationFailureItem(
                     test_method=test_method,
@@ -118,7 +137,7 @@ class PythonUnittestVerifier(Verifier):
         return None
 
     def parse_test_results(self, test_output):
-        total_tests_pattern = r"Ran (\d+) tests"
+        total_tests_pattern = r"Ran (\d+) test"
         failed_tests_pattern = r"FAIL:"
         error_tests_pattern = r"ERROR:"
 
@@ -131,6 +150,7 @@ class PythonUnittestVerifier(Verifier):
         total_failed = failed_tests_count + error_tests_count
 
         return total_failed, total_tests
+
 
 if __name__ == "__main__":
     verifier = PythonUnittestVerifier(test_file_pattern="*_test.py")

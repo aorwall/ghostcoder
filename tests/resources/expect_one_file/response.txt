@@ -1,6 +1,6 @@
 Here's the implementation:
 
-```python
+```
 def print_hello_world():
     print("Hello World!")
 ```

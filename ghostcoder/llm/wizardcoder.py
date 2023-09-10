@@ -16,16 +16,6 @@ class WizardCoderLLMWrapper(LLMWrapper):
         prompt_value += self.messages_to_prompt(messages)
         prompt_value += "\n\n### Response:\n"
 
-        # TODO: For testing
-        last_file = ""
-        for message in messages:
-            if message.sender == "Human":
-                for item in message.items :
-                    if isinstance(item, FileItem):
-                        last_file = "Filepath: " + item.file_path + "\n```python\n"
-
-        prompt_value += last_file
-
         retry_decorator = create_base_retry_decorator(error_types=[ValueError], max_retries=5)
 
         @retry_decorator
@@ -33,9 +23,6 @@ class WizardCoderLLMWrapper(LLMWrapper):
             return self.llm.predict(prompt_value)
 
         result = _completion_with_retry()
-
-        if last_file:
-            result = last_file + result + "```"
 
         usage = Stats.from_dict(
             prompt=self.__class__.__name__,

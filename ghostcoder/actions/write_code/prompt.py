@@ -14,7 +14,7 @@ When you update or add a new file you must follow the rules below:
 * YOU SHOULD avoid adding any comments to the new code sections you are proposing.
 
 ALL files should be presented in the following format:
-Filepath: path/to/file
+path/to/file.py
 ```language
 code 
 ```
@@ -97,7 +97,7 @@ When updating existing files:
 * YOU MUST include the definitions of parent classes and functions.
 
 ALL files should be presented in the following format:
-Filepath: path/to/file
+path/to/file
 ```language
 code 
 ```

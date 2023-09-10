@@ -1,4 +1,3 @@
-
 def proverb(input_list, qualifier="want"):
     if not input_list:
         return ""

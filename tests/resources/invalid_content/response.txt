@@ -1,7 +1,7 @@
 Here's how I would update the file:
 
 
-Filepath: `proverb.py`
+proverb.py
 ```python
 def proverb(input_list, qualifier="want"):
     """

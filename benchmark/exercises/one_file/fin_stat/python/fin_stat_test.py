@@ -1,7 +1,7 @@
 import unittest
-from finance_and_accounting import calculate_liabilities_and_equity
+from fin_stat import calculate_liabilities_and_equity
 
-class TestFinanceAndAccounting(unittest.TestCase):
+class TestFinStat(unittest.TestCase):
     def test_calculate_liabilities_and_equity(self):
         assets = [100, 200, 300, 400, 500]
         debt_equity_ratio = 0.5

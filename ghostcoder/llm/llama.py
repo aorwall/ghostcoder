@@ -22,7 +22,7 @@ class LlamaLLMWrapper(LLMWrapper):
             if message.sender == "Human":
                 for item in message.items :
                     if isinstance(item, FileItem):
-                        last_file = "Filepath: " + item.file_path + "\n```python\n"
+                        last_file = "\n" + item.file_path + "\n```python\n"
 
         prompt_value += last_file
 

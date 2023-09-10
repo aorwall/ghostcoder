@@ -1,6 +1,7 @@
 import difflib
 import logging
 import re
+from dataclasses import dataclass
 from typing import List, Union, Tuple
 from typing import Optional
 
@@ -17,15 +18,11 @@ from ghostcoder.verify.verifier import Verifier
 
 logger = logging.getLogger(__name__)
 
-class FileBlock(BaseModel):
-    file_path: str = Field(description="Path to the file")
-    language: str = Field(default=None, description="The language of the code")
-    content: str = Field(default="", description="The full updated content.")
-
-
-class CodeBlock(BaseModel):
-    content: str = Field(description="The updated content.")
-    language: str = Field(default=None, description="The language of the code")
+@dataclass
+class CodeBlock:
+    content: str
+    language: str = None
+    file_path: str = None
 
 
 def get_file_item(items: list, file_path: str):
@@ -37,24 +34,25 @@ def get_file_item(items: list, file_path: str):
     return None
 
 
-def extract_response_parts(response: str) -> List[Union[str, FileBlock]]:
+def extract_response_parts(response: str) -> List[Union[str, CodeBlock]]:
     """
     This function takes a string containing text and code blocks.
     It returns a list of CodeBlock, FileBlock, and non-code text in the order they appear.
 
     The function can parse two types of code blocks:
 
-    1) Square-bracketed code blocks with optional Filepath:
-    Filepath: /path/to/file
+    1) Backtick code blocks with optional file path:
+    F/path/to/file
+    ```LANGUAGE
+    code here
+    ```
+
+    2) Square-bracketed code blocks with optional file path:
+    /path/to/file
     [LANGUAGE]
     code here
     [/LANGUAGE]
 
-    2) Backtick code blocks with optional Filepath:
-    Filepath: /path/to/file
-    ```LANGUAGE
-    code here
-    ```
 
     Parameters:
     text (str): The input string containing code blocks and text
@@ -65,49 +63,67 @@ def extract_response_parts(response: str) -> List[Union[str, FileBlock]]:
 
     combined_parts = []
 
-    crlf_count = response.count('\r\n')
-    if crlf_count > 0:
-        logger.info(f"Found {crlf_count} CRLF line breaks in response, replacing with LF")
-        response = response.replace('\r\n', '\n').replace('\r', '\n')
+    # Normalize line breaks
+    response = response.replace("\r\n", "\n").replace("\r", "\n")
 
-    pattern = re.compile(r'(Filepath:\s*(.*?)\n)?\[(.*?)\]\n(.*?)\n\[/\3\]|(Filepath:\s*(.*?)\n)?```(\w+)?\n(.*?)\n```', re.DOTALL)
+    # Regex pattern to match code blocks
+    block_pattern = re.compile(
+        r"```(?P<language1>\w*)\n(?P<code1>.*?)\n```|"  # for backtick code blocks
+        r"\[(?P<language2>\w+)\]\n(?P<code2>.*?)\n\[/\3\]",  # for square-bracketed code blocks
+        re.DOTALL
+    )
+
+    # Define pattern to find files mentioned with backticks
+    file_pattern = re.compile(r"`([\w/]+\.\w{1,4})`")
+
+    # Pattern to check if the filename stands alone on the last line
+    standalone_file_pattern = re.compile(r"^([\w/]+\.\w{1,4})$")
 
     last_end = 0
 
-    for match in pattern.finditer(response):
+    for match in block_pattern.finditer(response):
         start, end = match.span()
 
-        non_code_text = response[last_end:start].strip()
-        if non_code_text:
-            combined_parts.append(non_code_text)
+        preceding_text = response[last_end:start].strip()
+        preceding_text_lines = preceding_text.split("\n")
 
-        # For square-bracketed code blocks
-        if match.group(3):
-            file_path = match.group(2)
-            file_path = file_path.strip() if file_path else None
-            language = match.group(3).lower()
-            content = match.group(4).strip()
-            if file_path:
-                code_block = FileBlock(file_path=file_path, language=language, content=content)
-            else:
-                code_block = CodeBlock(language=language, content=content)
-            combined_parts.append(code_block)
+        file_path = None
 
-        # For backtick code blocks
+        non_empty_lines = [line for line in preceding_text_lines if line.strip()]
+        if non_empty_lines:
+            last_line = non_empty_lines[-1].strip()
+            if standalone_file_pattern.match(last_line):
+                file_path = non_empty_lines[-1]
+                # Remove the standalone filename from the preceding text
+                idx = preceding_text_lines.index(file_path)
+                preceding_text_lines = preceding_text_lines[:idx]
+                preceding_text = "\n".join(preceding_text_lines).strip()
+
+            # If not found, then check for filenames in backticks
+            if not file_path:
+                all_matches = file_pattern.findall(last_line)
+                if all_matches:
+                    file_path = all_matches[-1]  # Taking the last match from backticks
+                    if len(all_matches) > 1:
+                        logging.info(f"Found multiple files in preceding text: {all_matches}, will set {file_path}")
+
+        # If there's any non-code preceding text, append it to the parts
+        if preceding_text:
+            combined_parts.append(preceding_text)
+
+        if match.group("language1") or match.group("code1"):
+            language = match.group("language1") or None
+            content = match.group("code1").strip()
         else:
-            file_path = match.group(6)
-            file_path = file_path.strip() if file_path else None
-            language = match.group(7)
-            content = match.group(8).strip()
-            if file_path:
-                code_block = FileBlock(file_path=file_path, language=language, content=content)
-            else:
-                code_block = CodeBlock(language=language, content=content)
-            combined_parts.append(code_block)
+            language = match.group("language2").lower()
+            content = match.group("code2").strip()
+
+        code_block = CodeBlock(file_path=file_path, language=language, content=content)
+
+        combined_parts.append(code_block)
 
         last_end = end
 
-    # Capture any remaining non-code text
     remaining_text = response[last_end:].strip()
     if remaining_text:
         combined_parts.append(remaining_text)
@@ -115,11 +131,13 @@ def extract_response_parts(response: str) -> List[Union[str, FileBlock]]:
     return combined_parts
 
 
+
+
 def do_diff(file_path: str, original_content: str, updated_content: str) -> Optional[str]:
     return "".join(difflib.unified_diff(
         original_content.strip().splitlines(True),
         updated_content.strip().splitlines(True),
-        fromfile=file_path, tofile=file_path, lineterm='\n'))
+        fromfile=file_path, tofile=file_path, lineterm="\n"))
 
 
 class WriteCodeAction(BaseAction):
@@ -132,6 +150,8 @@ class WriteCodeAction(BaseAction):
                  repository: FileRepository = None,
                  auto_mode: bool = False,
                  few_shot_prompt: bool = False,
+                 guess_similar_files: bool = True,
+                 expect_one_file: bool = False,
                  tries: int = 2,
                  verifier: Optional[Verifier] = None):
         if not sys_prompt:
@@ -143,6 +163,8 @@ class WriteCodeAction(BaseAction):
         self.tries = tries
         self.role_prompt = role_prompt
         self.few_shot_prompt = few_shot_prompt
+        self.guess_similar_files = guess_similar_files
+        self.expect_one_file = expect_one_file
         self.verifier = verifier
 
     def execute(self, message: Message, message_history: List[Message] = []) -> List[Message]:
@@ -193,19 +215,31 @@ class WriteCodeAction(BaseAction):
         items = []
         for block in blocks:
             if isinstance(block, CodeBlock):
-                logger.debug("Received code block: [{}...]".format(block.content[:25].replace("\n", "\\n")))
+                first_content = block.content[:40].replace("\n", "\\n")
+                logger.debug(f"Received code block with file path `{block.file_path}` and language `{block.language}`: "
+                             f"`{first_content}...`")
                 stats.increment("code_block")
-                file_block = self.code_to_file_block(block, file_items, stats)
-                if file_block:
-                    block = file_block
-                else:
-                    items.append(CodeItem(language=block.language, content=block.content))
-                    continue
 
-            if isinstance(block, FileBlock):
-                updated_file_item, retry_inputs_for_file = self.updated_file(stats, block, file_items)
-                if updated_file_item:
-                    items.append(updated_file_item)
+                if not block.file_path:
+                    self.set_file_path_to_block(block, file_items, stats)
+
+                if not block.file_path and self.expect_one_file and len(file_items) == 1:
+                    code_block_count = sum(1 for block in blocks if (isinstance(block, CodeBlock)
+                                                                     and not block.file_path
+                                                                     and (block.language is None
+                                                                          or block.language == file_items[0].language)))
+                    if code_block_count == 1:
+                        logger.debug(f"Found one code block with language {file_items[0].language} and no file path, "
+                                     f"will assume it's the updated file {file_items[0].file_path}")
+                        block.file_path = file_items[0].file_path
+
+                if block.file_path:
+                    updated_file_item, retry_inputs_for_file = self.updated_file(stats, block, file_items)
+                    retry_inputs.extend(retry_inputs_for_file)
+                    if updated_file_item:
+                        items.append(updated_file_item)
+                else:
+                    items.append(CodeItem(content=block.content, language=block.language))
             else:
                 logger.debug("Received text block: [{}...]".format(block[:25].replace("\n", "\\n")))
                 items.append(TextItem(text=block))
@@ -215,7 +249,7 @@ class WriteCodeAction(BaseAction):
                         TextItem(text="You responded with a incomplete code block. "
                                       "Please provide the contents of the whole file in a code block closed with ```."))
 
-        outgoing_files = ""
+        updated_files_str = ""
 
         did_changes = False
         for item in items:
@@ -230,12 +264,12 @@ class WriteCodeAction(BaseAction):
                         item.error = f"Failed to update file {item.file_path}: {e}"
                         stats.increment("failed_to_update_file")
                         logger.error(item.error)
-                outgoing_files += f"\n- {item.to_log()}"
+                updated_files_str += f"\n- {item.to_log()}"
 
-        if outgoing_files:
-            logger.info(f"Outgoing files: {outgoing_files}")
+        if updated_files_str:
+            logger.info(f"Updated files: {updated_files_str}")
         else:
-            logger.info(f"No outgoing files")
+            logger.info(f"No updated files")
 
         ai_message = Message(sender="AI", items=items, stats=stats)
         ai_messages = [ai_message]
@@ -265,8 +299,11 @@ class WriteCodeAction(BaseAction):
 
         return ai_messages
 
-    def code_to_file_block(self, block: CodeBlock, file_items: List[FileItem], stats: Stats) -> Optional[FileBlock]:
+    def set_file_path_to_block(self, block: CodeBlock, file_items: List[FileItem], stats: Stats):
         """Tries to find a file item that matches the code block."""
+
+        if not self.guess_similar_files:
+            return
 
         for file_item in file_items:
             if not file_item.language:
@@ -289,17 +326,15 @@ class WriteCodeAction(BaseAction):
                     logger.info(f"Code block has similarities to {file_item.file_path}, will assume it's the "
                                  f"updated file.\nSimilarities:{matching_content_str})")
                     stats.increment("guess_file_item")
-                    return FileBlock(
-                        file_path=file_item.file_path,
-                        content=block.content,
-                        language=file_item.language)
+
+                    block.file_path = file_item.file_path
+                    block.language = file_item.language
             except Exception as e:
                 logger.warning(
                     f"Could not parse file with {file_item.language} or code block with language {block.language}: {e}")
 
-        return None
 
-    def updated_file(self, stats: Stats, block: FileBlock, file_items: List[FileItem]) -> Tuple[Optional[UpdatedFileItem], List[TextItem]]:
+    def updated_file(self, stats: Stats, block: CodeBlock, file_items: List[FileItem]) -> Tuple[Optional[UpdatedFileItem], List[TextItem]]:
         logger.debug("Received file block: [{}]".format(block.file_path))
         stats.increment("file_item")
         original_file_item = get_file_item(file_items, block.file_path)
@@ -319,7 +354,7 @@ class WriteCodeAction(BaseAction):
             ), retry_inputs
 
         parser = None
-        if block.language:
+        if block.language in ["python", "java", "typescript", "javascript"]:
             try:
                 parser = create_parser(block.language)
             except Exception as e:
@@ -343,7 +378,7 @@ class WriteCodeAction(BaseAction):
                 invalid = "syntax_error"
                 for error_block in error_blocks:
                     retry_inputs.append(
-                        FileItem(language=block.language, content=error_block.to_string(), file_path=block.file_path))
+                        CodeItem(language=block.language, content=error_block.to_string()))
             elif original_file_item and not original_file_item.readonly:
                 original_block = parser.parse(original_file_item.content)
                 gpt_tweaks = original_block.merge(updated_block, first_level=True)

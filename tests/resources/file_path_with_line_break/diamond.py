@@ -1,2 +1,0 @@
-def rows(letter):
-    pass

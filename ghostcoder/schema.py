@@ -1,4 +1,5 @@
 import logging
+from enum import Enum
 from typing import List, Union, Optional, Dict, Any
 
 from langchain.callbacks.openai_info import get_openai_token_cost_for_model, MODEL_COST_PER_1K_TOKENS
@@ -77,10 +78,10 @@ class FileItem(CodeItem):
         if self.readonly:
             readonly_str = " (readonly)"
 
-        return f"\nFilepath: {self.file_path}{readonly_str}\n{super().to_prompt(style=style)}"
+        return f"{self.file_path}{readonly_str}\n{super().to_prompt(style=style)}"
 
     def to_history(self) -> str:
-        return f"Filepath: {self.file_path}"
+        return f"{self.file_path}"
 
     def to_log(self):
         details = ""
@@ -319,3 +320,8 @@ class DiscardFilesRequest(BaseModel):
 class FileContent(BaseModel):
     file_path: str
     content: str
+
+class Difficulty(Enum):
+    EASY = "easy"
+    MEDIUM = "medium"
+    HARD = "hard"
