@@ -47,10 +47,13 @@ class CodeItem(Item):
 
 class VerificationFailureItem(Item):
     type: str = "verification_failure"
-    output: str = Field(description="Output")
+    output: str = Field(description="Output of the verification process")
     test_method: Optional[str] = Field(default=None, description="Test method")
     test_class: Optional[str] = Field(default=None, description="Test class")
     test_file: Optional[str] = Field(default=None, description="Test file")
+
+    def to_prompt(self, style: Optional[str] = None):
+        return f"Test method {self.test_class}.{self.test_method} in `{self.test_file}` failed. Output:\n```\n{self.output}\n```"
 
 
 class FileItem(CodeItem):
@@ -74,20 +77,53 @@ class FileItem(CodeItem):
         if self.readonly:
             readonly_str = " (readonly)"
 
-        return f"Filepath: {self.file_path}{readonly_str}\n{super().to_prompt(style=style)}"
+        return f"\nFilepath: {self.file_path}{readonly_str}\n{super().to_prompt(style=style)}"
 
     def to_history(self) -> str:
         return f"Filepath: {self.file_path}"
+
+    def to_log(self):
+        details = ""
+        if self.language:
+            details += f"{self.language}"
+
+        if self.readonly:
+            if details:
+                details += ", "
+            details += "readonly"
+
+        if not self.content:
+            if details:
+                details += ", "
+            details += "new"
+
+        if details:
+            return f"{self.file_path} ({details})"
+
+        return f"{self.file_path}"
 
 
 class UpdatedFileItem(FileItem):
     type: str = "updated_file"
     file_path: str = Field(description="file to update or create")
     error: Optional[str] = Field(default=None, description="error message")
-    invalid: bool = Field(default=False, description="file is invalid")
+    invalid: str = Field(default=None, description="file is invalid")
+    created: bool = Field(default=False, description="file is created")
 
     def to_prompt(self, style: Optional[str] = None):
         return super().to_prompt(style=style)
+
+    def to_log(self):
+        if self.error:
+            status = "failed"
+        elif self.invalid:
+            status = self.invalid
+        elif self.created:
+            status = "created"
+        else:
+            status = "updated"
+
+        return f"{self.file_path} ({status})"
 
     def __str__(self) -> str:
         return self.to_prompt()
@@ -140,7 +176,7 @@ class Stats(BaseModel):
     metrics: dict = {}
 
     @classmethod
-    def from_dict(cls, prompt: str, llm_output: dict, duration: float, extra: dict = {}):
+    def from_dict(cls, prompt: str, duration: float, llm_output: dict = {}, extra: dict = {}):
         token_usage = llm_output.get("token_usage", {})
         model_name = llm_output.get("model_name", "unknown")
         prompt_tokens = token_usage.get("prompt_tokens", 0)
@@ -197,9 +233,7 @@ class Message(ItemHolder):
     stats: Optional[Stats] = Field(default=None, description="status information about the processing of the message")
     commit_id: Optional[str] = None
     discarded: bool = False
-
-    def __str__(self) -> str:
-        return "\n".join([str(item) for item in self.items])
+    auto: bool = False
 
     def to_prompt(self, style: Optional[str] = None) -> str:
         return "\n\n".join([item.to_prompt(style=style) for item in self.items])
@@ -210,6 +244,17 @@ class Message(ItemHolder):
 
     def find_items_by_type(self, item_type: str):
         return [item for item in self.items if item.type == item_type]
+
+
+class VerificationResult(BaseModel):
+    success: bool
+    message: str = ""
+    failures: List[VerificationFailureItem] = []
+    def to_prompt(self):
+        if self.success:
+            return self.message
+        else:
+            return self.message + "\n" + "\n".join([failure.to_prompt() for failure in self.failures])
 
 
 class MergeResponse(BaseModel):

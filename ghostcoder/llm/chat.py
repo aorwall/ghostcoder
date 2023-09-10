@@ -20,9 +20,9 @@ class ChatLLMWrapper(LLMWrapper):
 
         for message in messages:
             if message.sender == "AI":
-                llm_messages.append(AIMessage(content=str(message)))
+                llm_messages.append(AIMessage(content=message.to_prompt()))
             else:
-                llm_messages.append(HumanMessage(content=str(message)))
+                llm_messages.append(HumanMessage(content=message.to_prompt()))
 
         result = self.llm.generate([llm_messages])
         content = result.generations[0][0].text

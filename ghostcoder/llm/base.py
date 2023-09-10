@@ -18,9 +18,10 @@ class LLMWrapper:
         prompt_value = "System: " + sys_prompt + "\n" + self.messages_to_prompt(messages)
         result = self.llm.generate_prompt([StringPromptValue(text=prompt_value)])
         content = result.generations[0][0].text
+
         usage = Stats.from_dict(
             prompt=self.__class__.__name__,
-            llm_output={},
+            llm_output=result.llm_output,
             duration=time.time() - starttime)
         return content, usage
 
