@@ -250,7 +250,9 @@ class Message(ItemHolder):
 class VerificationResult(BaseModel):
     success: bool
     message: str = ""
+    verification_count: int = 0
     failures: List[VerificationFailureItem] = []
+
     def to_prompt(self):
         if self.success:
             return self.message

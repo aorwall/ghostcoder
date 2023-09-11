@@ -14,9 +14,10 @@ When you update or add a new file you must follow the rules below:
 * YOU SHOULD avoid adding any comments to the new code sections you are proposing.
 
 ALL files should be presented in the following format:
-path/to/file.py
-```language
-code 
+
+file.py
+```python
+# ... code  
 ```
 """
 
@@ -61,7 +62,7 @@ FEW_SHOT_PYTHON_2 = [
 FEW_SHOT_PYTHON_3 = [
     Message(sender="Human", items=[
         TextItem(text="Add a new method named area to the class Rectangle that calculates and returns the area of the rectangle."),
-        FileItem(file_path="shapes.py",
+        FileItem(file_path="shapes/shapes.py",
                  content="""class Rectangle:
     def __init__(self, length, width):
         self.length = length
@@ -70,7 +71,7 @@ FEW_SHOT_PYTHON_3 = [
     Message(sender="AI", items=[
         #TextItem(text="""Explanation:
 #In the Rectangle class, the area method calculates the area of the rectangle by multiplying its length and width, and returns the result."""),
-        UpdatedFileItem(file_path="shapes.py",
+        UpdatedFileItem(file_path="shapes/shapes.py",
                  content="""class Rectangle:
     def __init__(self, length, width):
         self.length = length
@@ -97,9 +98,10 @@ When updating existing files:
 * YOU MUST include the definitions of parent classes and functions.
 
 ALL files should be presented in the following format:
-path/to/file
-```language
-code 
+
+file.py
+```python
+# ... code  
 ```
 """
 

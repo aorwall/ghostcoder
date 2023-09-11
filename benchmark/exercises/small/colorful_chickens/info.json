@@ -1,0 +1,46 @@
+{
+  "instruction_format": "tech-details",
+  "exercise": "colorful_chickens",
+  "benchmark_results": [
+    {
+      "llm_name": "gpt-3.5-turbo",
+      "llm_params": {
+        "temperature": 0.0
+      },
+      "success": true,
+      "retries": 1
+    },
+    {
+      "llm_name": "gpt-3.5-turbo",
+      "llm_params": {
+        "temperature": 0.2
+      },
+      "success": true,
+      "retries": 1
+    },
+    {
+      "llm_name": "gpt-3.5-turbo",
+      "llm_params": {
+        "temperature": 0.4
+      },
+      "success": true,
+      "retries": 1
+    },
+    {
+      "llm_name": "gpt-3.5-turbo",
+      "llm_params": {
+        "temperature": 0.6000000000000001
+      },
+      "success": true,
+      "retries": 0
+    },
+    {
+      "llm_name": "gpt-3.5-turbo",
+      "llm_params": {
+        "temperature": 0.8
+      },
+      "success": true,
+      "retries": 1
+    }
+  ]
+}

@@ -77,7 +77,7 @@ def extract_response_parts(response: str) -> List[Union[str, CodeBlock]]:
     file_pattern = re.compile(r"`([\w/]+\.\w{1,4})`")
 
     # Pattern to check if the filename stands alone on the last line
-    standalone_file_pattern = re.compile(r"^([\w/]+\.\w{1,4})$")
+    standalone_file_pattern = re.compile(r'^(?:"|`)?(?P<filename>[\w/]+\.\w{1,4})(?:"|`)?$')
 
     last_end = 0
 
@@ -92,10 +92,12 @@ def extract_response_parts(response: str) -> List[Union[str, CodeBlock]]:
         non_empty_lines = [line for line in preceding_text_lines if line.strip()]
         if non_empty_lines:
             last_line = non_empty_lines[-1].strip()
-            if standalone_file_pattern.match(last_line):
-                file_path = non_empty_lines[-1]
+
+            filename_match = standalone_file_pattern.match(last_line)
+            if filename_match:
+                file_path = filename_match.group("filename")
                 # Remove the standalone filename from the preceding text
-                idx = preceding_text_lines.index(file_path)
+                idx = preceding_text_lines.index(last_line)
                 preceding_text_lines = preceding_text_lines[:idx]
                 preceding_text = "\n".join(preceding_text_lines).strip()
 
@@ -152,6 +154,7 @@ class WriteCodeAction(BaseAction):
                  few_shot_prompt: bool = False,
                  guess_similar_files: bool = True,
                  expect_one_file: bool = False,
+                 allow_hallucinated_files: bool = False,
                  tries: int = 2,
                  verifier: Optional[Verifier] = None):
         if not sys_prompt:
@@ -165,6 +168,7 @@ class WriteCodeAction(BaseAction):
         self.few_shot_prompt = few_shot_prompt
         self.guess_similar_files = guess_similar_files
         self.expect_one_file = expect_one_file
+        self.allow_hallucinations = allow_hallucinated_files
         self.verifier = verifier
 
     def execute(self, message: Message, message_history: List[Message] = []) -> List[Message]:
@@ -244,6 +248,7 @@ class WriteCodeAction(BaseAction):
                 logger.debug("Received text block: [{}...]".format(block[:25].replace("\n", "\\n")))
                 items.append(TextItem(text=block))
                 if self.has_not_closed_code_blocks(block):
+                    # TODO: Handle if this is due to max token limit
                     stats.increment("not_closed_code_block")
                     retry_inputs.append(
                         TextItem(text="You responded with a incomplete code block. "
@@ -333,7 +338,6 @@ class WriteCodeAction(BaseAction):
                 logger.warning(
                     f"Could not parse file with {file_item.language} or code block with language {block.language}: {e}")
 
-
     def updated_file(self, stats: Stats, block: CodeBlock, file_items: List[FileItem]) -> Tuple[Optional[UpdatedFileItem], List[TextItem]]:
         logger.debug("Received file block: [{}]".format(block.file_path))
         stats.increment("file_item")
@@ -346,11 +350,32 @@ class WriteCodeAction(BaseAction):
         invalid = None
         new = False
 
+        # Don't merge and mark as invalid if the file is readonly
         if original_file_item and original_file_item.readonly:
             return UpdatedFileItem(
                 file_path=block.file_path,
                 content=updated_content,
                 invalid="readonly",
+            ), retry_inputs
+
+        # Don't merge and mark as invalid if hallucinated files isn't allowed
+        if not original_file_item and not self.allow_hallucinations:
+            logger.warning(f"Could not find file {block.file_path} in initial message")
+            stats.increment("missing_file")
+            available_files = ", ".join([f"`{f.file_path}`" for f in file_items])
+            retry_inputs.append(TextItem(text=f"I only expected the following files in the response {available_files}. "
+                                              f"But `{block.file_path} was returned."))
+            return UpdatedFileItem(
+                file_path=block.file_path,
+                content=updated_content,
+                invalid="hallucination",
+            ), retry_inputs
+
+        # Just return the updated content if original file is empty
+        if not original_file_item.content:
+            return UpdatedFileItem(
+                file_path=block.file_path,
+                content=updated_content
             ), retry_inputs
 
         parser = None

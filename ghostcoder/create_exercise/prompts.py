@@ -72,12 +72,13 @@ BUSINESS_AREAS_PROMPT = """Pick a random business area."""
 
 INSTRUCTION_SYSTEM_PROMPT = """You're a staff engineer with long experience in writing programming exercises. 
 
-When writing new programming exercises you should follow the following rules: 
+When writing new programming exercises you should follow the following rules:
+* The solution should be possible implement in a single function. 
+* Max 3 instructions
 * The exercise must be unique in a way that makes it impossible to find similar exercises or code on the internet. Think outside the box!
 * The exercise should not adhere to a specific programming language. 
 * Do not imply on the use of any programming language by including names based on code conventions, the use of specific libaries etc.
 * Do not suggest names for variables, functions, classes etc. 
-* The solution should be possible to implement in a single file. 
 * Another developer will handle the implementation of tests, so you don't need add any instruction about writing tests. 
 * The solution should be implementable using only the standard libraries.
 * The solution will solely be invoked through test cases and does not require a user interface, database connections, APIs, or command-line interfaces.
@@ -104,6 +105,9 @@ path_to/instructions.md
 2. ...
 ```
 """
+
+FILE_SCOPE = "* The solution should be possible to implement in a single file. "
+FUNCTION_SCOPE = "* The instructions should eb for a solution small and simple enough to implement in a single function. "
 
 EXAMPLE_EXERCISE_NAME = "sales_queries"
 
@@ -145,6 +149,8 @@ First list of the changes you made and then print out the updated file.
  
 Do not add any other sections than Instructions, Constraints and Evaluation Criteria.
 
+Do not change the description of the exercise or the title if not absolutely necessary.
+
 Things to look for:
 * Skill: Does the exercise evaluate the candidate's knowledge of {skill} 
 * No Contradictions: Check to see if there are conflicting instructions or requirements.
@@ -152,17 +158,18 @@ Things to look for:
 * Clarity of Instructions: Ensure that the problem statement is clear and easy to understand. Avoid jargon unless it's explained or necessary for the exercise.
 """
 
-WRITE_TEST_AND_SOLUTION_SYSTEM_PROMPT = """You are a staff engineer at a large company, you have been given an programming exercise 
-instruction and should write an example implementation and a test suite to validate the implementation based on the given requirements.
+WRITE_TEST_AND_SOLUTION_SYSTEM_PROMPT = PromptTemplate.from_template("""You are a staff engineer at a large company, you have been given an programming exercise 
+instruction and should write an example implementation and a test suite in {language} to validate the implementation based on the given requirements.
 
 Please adhere to the following rules:
+* Each test case should be in its own test method.
+* There should be at least one test method for each instruction and constraint.
 * There should be no contradictions between the test suite and the instructions.
 * The interfaces in the solution code should clearly specify the types, data structures, etc., needed to run the tests.
-* The tests should cover all the requirements, corner cases, and constraints specified in the instructions.
 * All test methods must be properly implemented. If a test method cannot be implemented due to missing instructions, 
-* There should be at least one test case for each instruction and constraint. 
 * Write a description of the test case on which instructions or constraints it tests. 
-"""
+{language_specifics}
+""")
 
 EXAMPLE_IMPLEMENTATION = """class Customer:
     def __init__(self, id: int, name: str, total_purchases: float):
@@ -316,14 +323,14 @@ Please adhere to the following rules:
 * The interfaces in the file stub code should clearly specify the types, data structures, etc., needed to run the tests.
 """
 
-WRITE_TEST_AND_SOLUTION_PROMPT = PromptTemplate.from_template("""Create a test suite and example implementation in {language}""")
-
 VERIFY_TEST_SYSTEM_PROMPT = """The programming exercise can be found in the file instructions.md. 
 Accompanying these instructions is an example implementation and a test suite to verify that the requirements have been implemented correctly.
 
 Please verify the following in the files:
-* There should be no contradictions between the test suite, the implementation and the instructions.
-* The tests should cover all the requirements, edge cases, and constraints specified in the instructions.
+* Each test case should be in its own method. If one test method covers more than one case it should be split into multiple methods.
+* There should be no contradictions between the test suite, the implementation and the instructions. Update any of the files if necessary.
+* There should be at least one test method for each instruction and constraint. Add any missing test methods. 
+* The tests should cover all the requirements, edge cases, and constraints specified in the instructions. Add any missing test methods.
 * All test methods must be properly implemented. If a test method cannot be implemented due to missing instructions, the instructions file needs to be updated.
 * Update instructions that can't be implemented or tested.
 

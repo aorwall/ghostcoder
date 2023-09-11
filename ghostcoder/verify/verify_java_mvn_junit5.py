@@ -10,7 +10,7 @@ from ghostcoder.schema import VerificationFailureItem, VerificationResult
 from ghostcoder.verify.verifier import Verifier
 
 
-class PythonUnittestVerifier(Verifier):
+class JavaMvnUnit5Verifier(Verifier):
 
     def __init__(self,
                  test_file_pattern: str = "*.py",
@@ -26,12 +26,8 @@ class PythonUnittestVerifier(Verifier):
 
     def verify(self) -> VerificationResult:
         command = [
-            "python",
-            "-m",
-            "unittest",
-            "discover",
-            "-p",
-            self.test_file_pattern,
+            "mvn",
+            "test"
         ]
 
         command_str = " ".join(command)
@@ -157,7 +153,7 @@ class PythonUnittestVerifier(Verifier):
 
 
 if __name__ == "__main__":
-    verifier = PythonUnittestVerifier(test_file_pattern="*_test.py")
+    verifier = JavaMvnUnit5Verifier(test_file_pattern="*_test.py")
 
     items = verifier.verify()
 
