@@ -1,0 +1,29 @@
+{
+  "authors": [
+    "sjakobi"
+  ],
+  "contributors": [
+    "behrtam",
+    "cmccandless",
+    "crsmi",
+    "Dog",
+    "lemoncurry",
+    "N-Parsons",
+    "pheanex",
+    "tqa236"
+  ],
+  "files": {
+    "solution": [
+      "zebra_puzzle.py"
+    ],
+    "test": [
+      "zebra_puzzle_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Solve the zebra puzzle.",
+  "source": "Wikipedia",
+  "source_url": "https://en.wikipedia.org/wiki/Zebra_Puzzle"
+}

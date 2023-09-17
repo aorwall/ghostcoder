@@ -1,0 +1,40 @@
+{%- import "generator_macros.j2" as macros with context -%}
+{{ macros.canonical_ref() }}
+
+{{ macros.header(["CircularBuffer","BufferEmptyException", "BufferFullException"]) }}
+
+{% macro call_op(op) -%}
+buf.{{ op["operation"] }}(
+    {% if "item" in op -%}
+    "{{ op["item"] }}"
+    {%- endif -%}
+)
+{%- endmacro -%}
+
+
+class {{ exercise | camel_case }}Test(unittest.TestCase):
+    {% for case in cases %}
+    {%- set input = case["input"] -%}
+    {%- set case_name = case["description"] | to_snake %}
+    def test_{{ case_name }}(self):
+        buf = CircularBuffer({{ input["capacity"] }})
+        {% for op in input["operations"] -%}
+        {% if op.get("should_succeed", True) -%}
+        {% if "expected" in op -%}
+        self.assertEqual({{ call_op(op) }}, "{{ op["expected"] }}")
+        {% else -%}
+        {{ call_op(op) }}
+        {% endif -%}
+        {% else -%}
+        with self.assertRaises(BufferError) as err:
+            {{ call_op(op) }}
+        {% if op.get("operation") == "read"  %}
+        self.assertEqual(type(err.exception), BufferEmptyException)
+        self.assertEqual(err.exception.args[0], "Circular buffer is empty")
+        {% else %}
+        self.assertEqual(type(err.exception), BufferFullException)
+        self.assertEqual(err.exception.args[0], "Circular buffer is full")
+        {% endif -%}
+        {% endif -%}
+        {% endfor %}
+    {% endfor %}

@@ -1,0 +1,27 @@
+{
+  "authors": [
+    "behrtam"
+  ],
+  "contributors": [
+    "cmccandless",
+    "Dog",
+    "ikhadykin",
+    "N-Parsons",
+    "pywkm",
+    "smt923",
+    "tqa236",
+    "yawpitch"
+  ],
+  "files": {
+    "solution": [
+      "all_your_base.py"
+    ],
+    "test": [
+      "all_your_base_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Convert a number, represented as a sequence of digits in one base, to any other base."
+}

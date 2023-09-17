@@ -1,0 +1,2 @@
+def steps(number):
+    pass

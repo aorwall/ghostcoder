@@ -1,0 +1,2 @@
+def convert(number):
+    pass

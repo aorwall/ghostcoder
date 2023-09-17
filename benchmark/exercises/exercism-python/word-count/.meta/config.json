@@ -1,0 +1,38 @@
+{
+  "authors": [],
+  "contributors": [
+    "behrtam",
+    "c4llmeco4ch",
+    "cmccandless",
+    "Dog",
+    "gabriel376",
+    "Grociu",
+    "guygastineau",
+    "ikhadykin",
+    "jackattack24",
+    "kytrinyx",
+    "lowks",
+    "N-Parsons",
+    "pheanex",
+    "rivergillis",
+    "samdec11",
+    "sjakobi",
+    "tqa236",
+    "wobh",
+    "yawpitch",
+    "ZacharyRSmith"
+  ],
+  "files": {
+    "solution": [
+      "word_count.py"
+    ],
+    "test": [
+      "word_count_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Given a phrase, count the occurrences of each word in that phrase.",
+  "source": "This is a classic toy problem, but we were reminded of it by seeing it in the Go Tour."
+}

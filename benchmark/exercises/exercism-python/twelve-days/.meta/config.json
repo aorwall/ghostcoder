@@ -1,0 +1,31 @@
+{
+  "authors": [
+    "sjakobi"
+  ],
+  "contributors": [
+    "ackerleytng",
+    "behrtam",
+    "cmccandless",
+    "Dog",
+    "kytrinyx",
+    "N-Parsons",
+    "PatrickMcSweeny",
+    "pheanex",
+    "rootulp",
+    "tqa236"
+  ],
+  "files": {
+    "solution": [
+      "twelve_days.py"
+    ],
+    "test": [
+      "twelve_days_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Output the lyrics to 'The Twelve Days of Christmas'.",
+  "source": "Wikipedia",
+  "source_url": "https://en.wikipedia.org/wiki/The_Twelve_Days_of_Christmas_(song)"
+}

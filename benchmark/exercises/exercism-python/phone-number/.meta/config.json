@@ -1,0 +1,34 @@
+{
+  "authors": [],
+  "contributors": [
+    "AnAccountForReportingBugs",
+    "behrtam",
+    "cmccandless",
+    "Dog",
+    "GascaK",
+    "ikhadykin",
+    "jeremystucki",
+    "kytrinyx",
+    "lowks",
+    "N-Parsons",
+    "pheanex",
+    "sjakobi",
+    "Sukhj1nder",
+    "tqa236",
+    "yawpitch"
+  ],
+  "files": {
+    "solution": [
+      "phone_number.py"
+    ],
+    "test": [
+      "phone_number_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Clean up user-entered phone numbers so that they can be sent SMS messages.",
+  "source": "Exercise by the JumpstartLab team for students at The Turing School of Software and Design.",
+  "source_url": "https://turing.edu"
+}

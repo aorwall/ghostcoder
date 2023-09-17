@@ -1,0 +1,39 @@
+{
+  "authors": [
+    "sjakobi"
+  ],
+  "contributors": [
+    "AnAccountForReportingBugs",
+    "behrtam",
+    "BethanyG",
+    "cmccandless",
+    "Dog",
+    "Grociu",
+    "ikhadykin",
+    "kytrinyx",
+    "mambocab",
+    "N-Parsons",
+    "Nishant23",
+    "olufotebig",
+    "pheanex",
+    "rootulp",
+    "thomasjpfan",
+    "tqa236",
+    "xitanggg",
+    "yawpitch"
+  ],
+  "files": {
+    "solution": [
+      "luhn.py"
+    ],
+    "test": [
+      "luhn_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Given a number determine whether or not it is valid per the Luhn formula.",
+  "source": "The Luhn Algorithm on Wikipedia",
+  "source_url": "https://en.wikipedia.org/wiki/Luhn_algorithm"
+}

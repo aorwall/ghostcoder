@@ -1,0 +1,25 @@
+{
+  "authors": [
+    "cmccandless"
+  ],
+  "contributors": [
+    "BethanyG",
+    "Dog",
+    "dvermd",
+    "N-Parsons",
+    "tqa236",
+    "yawpitch"
+  ],
+  "files": {
+    "solution": [
+      "dominoes.py"
+    ],
+    "test": [
+      "dominoes_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Make a chain of dominoes."
+}

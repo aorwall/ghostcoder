@@ -1,0 +1,25 @@
+{
+  "authors": [
+    "cmccandless"
+  ],
+  "contributors": [
+    "Dog",
+    "N-Parsons",
+    "Nishant23",
+    "tqa236",
+    "meatball133",
+    "Bethanyg"
+  ],
+  "files": {
+    "solution": [
+      "react.py"
+    ],
+    "test": [
+      "react_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Implement a basic reactive system."
+}

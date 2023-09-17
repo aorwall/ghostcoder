@@ -1,0 +1,23 @@
+{
+  "authors": [
+    "clapmyhands"
+  ],
+  "contributors": [
+    "cmccandless",
+    "Dog",
+    "N-Parsons",
+    "tqa236"
+  ],
+  "files": {
+    "solution": [
+      "tree_building.py"
+    ],
+    "test": [
+      "tree_building_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Refactor a tree building algorithm."
+}

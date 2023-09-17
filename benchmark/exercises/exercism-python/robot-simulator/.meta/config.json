@@ -1,0 +1,31 @@
+{
+  "authors": [
+    "behrtam"
+  ],
+  "contributors": [
+    "cmccandless",
+    "denislooby",
+    "Dog",
+    "Galixxon",
+    "GKotfis",
+    "Grociu",
+    "JuliaKBremer",
+    "N-Parsons",
+    "parinporecha",
+    "pheanex",
+    "tqa236"
+  ],
+  "files": {
+    "solution": [
+      "robot_simulator.py"
+    ],
+    "test": [
+      "robot_simulator_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Write a robot simulator.",
+  "source": "Inspired by an interview question at a famous company."
+}

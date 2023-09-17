@@ -1,0 +1,27 @@
+{
+  "authors": [
+    "ackerleytng"
+  ],
+  "contributors": [
+    "cmccandless",
+    "Dog",
+    "N-Parsons",
+    "pranasziaukas",
+    "tqa236",
+    "yawpitch"
+  ],
+  "files": {
+    "solution": [
+      "dot_dsl.py"
+    ],
+    "test": [
+      "dot_dsl_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Write a Domain Specific Language similar to the Graphviz dot language.",
+  "source": "Wikipedia",
+  "source_url": "https://en.wikipedia.org/wiki/DOT_(graph_description_language)"
+}

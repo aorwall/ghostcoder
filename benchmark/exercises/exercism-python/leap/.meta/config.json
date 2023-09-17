@@ -1,0 +1,38 @@
+{
+  "authors": [],
+  "contributors": [
+    "AnAccountForReportingBugs",
+    "behrtam",
+    "BethanyG",
+    "betojulio",
+    "cmccandless",
+    "cruxicheiros",
+    "Dog",
+    "fluxusfrequency",
+    "iandexter",
+    "ikhadykin",
+    "kytrinyx",
+    "lowks",
+    "N-Parsons",
+    "olufotebig",
+    "pheanex",
+    "sambryant4",
+    "sjakobi",
+    "tqa236",
+    "yawpitch"
+  ],
+  "files": {
+    "solution": [
+      "leap.py"
+    ],
+    "test": [
+      "leap_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Given a year, report if it is a leap year.",
+  "source": "CodeRanch Cattle Drive, Assignment 3",
+  "source_url": "https://coderanch.com/t/718816/Leap"
+}

@@ -1,0 +1,34 @@
+{
+  "blurb": "Compute Pascal's triangle up to a given number of rows.",
+  "authors": [
+    "betegelse",
+    "PaulT89"
+  ],
+  "contributors": [
+    "behrtam",
+    "cmccandless",
+    "Dog",
+    "ikhadykin",
+    "ikkebr",
+    "kytrinyx",
+    "N-Parsons",
+    "olufotebig",
+    "parinporecha",
+    "pheanex",
+    "sjakobi",
+    "tqa236"
+  ],
+  "files": {
+    "solution": [
+      "pascals_triangle.py"
+    ],
+    "test": [
+      "pascals_triangle_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "source": "Pascal's Triangle at Wolfram Math World",
+  "source_url": "https://www.wolframalpha.com/input/?i=Pascal%27s+triangle"
+}

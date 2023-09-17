@@ -1,0 +1,34 @@
+{
+  "authors": [],
+  "contributors": [
+    "behrtam",
+    "BethanyG",
+    "cmccandless",
+    "denislooby",
+    "Dog",
+    "kytrinyx",
+    "lowks",
+    "MojitoMonday",
+    "N-Parsons",
+    "pheanex",
+    "sdublish",
+    "sjakobi",
+    "smalley",
+    "tqa236",
+    "yawpitch"
+  ],
+  "files": {
+    "solution": [
+      "grains.py"
+    ],
+    "test": [
+      "grains_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Calculate the number of grains of wheat on a chessboard given that the number on each square doubles.",
+  "source": "The CodeRanch Cattle Drive, Assignment 6",
+  "source_url": "https://coderanch.com/wiki/718824/Grains"
+}

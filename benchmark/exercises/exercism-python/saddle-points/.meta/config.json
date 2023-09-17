@@ -1,0 +1,40 @@
+{
+  "authors": [
+    "betegelse"
+  ],
+  "contributors": [
+    "Alexhans",
+    "AnAccountForReportingBugs",
+    "behrtam",
+    "BethanyG",
+    "cmccandless",
+    "crsmi",
+    "ctholho",
+    "DocFogel",
+    "Dog",
+    "elyssonmr",
+    "ikhadykin",
+    "ilmanzo",
+    "kytrinyx",
+    "N-Parsons",
+    "pheanex",
+    "pywkm",
+    "sjakobi",
+    "tqa236",
+    "yawpitch"
+  ],
+  "files": {
+    "solution": [
+      "saddle_points.py"
+    ],
+    "test": [
+      "saddle_points_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Detect saddle points in a matrix.",
+  "source": "J Dalbey's Programming Practice problems",
+  "source_url": "https://users.csc.calpoly.edu/~jdalbey/103/Projects/ProgrammingPractice.html"
+}

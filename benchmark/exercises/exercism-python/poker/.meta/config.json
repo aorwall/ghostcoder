@@ -1,0 +1,32 @@
+{
+  "authors": [
+    "MartinDelille"
+  ],
+  "contributors": [
+    "behrtam",
+    "cmccandless",
+    "Dog",
+    "dvermd",
+    "ikhadykin",
+    "jnaulty",
+    "kytrinyx",
+    "N-Parsons",
+    "njgingrich",
+    "pheanex",
+    "tqa236"
+  ],
+  "files": {
+    "solution": [
+      "poker.py"
+    ],
+    "test": [
+      "poker_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Pick the best hand(s) from a list of poker hands.",
+  "source": "Inspired by the training course from Udacity.",
+  "source_url": "https://www.udacity.com/course/design-of-computer-programs--cs212"
+}

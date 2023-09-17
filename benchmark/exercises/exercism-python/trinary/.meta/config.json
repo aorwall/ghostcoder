@@ -1,0 +1,30 @@
+{
+  "blurb": "Convert a trinary number, represented as a string (e.g. '102012'), to its decimal equivalent using first principles.",
+  "authors": [
+    "betegelse"
+  ],
+  "contributors": [
+    "behrtam",
+    "cmccandless",
+    "Dog",
+    "ikhadykin",
+    "kytrinyx",
+    "N-Parsons",
+    "pheanex",
+    "sjakobi",
+    "tqa236"
+  ],
+  "files": {
+    "solution": [
+      "trinary.py"
+    ],
+    "test": [
+      "trinary_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "source": "All of Computer Science",
+  "source_url": "https://www.wolframalpha.com/examples/mathematics/numbers/base-conversions"
+}

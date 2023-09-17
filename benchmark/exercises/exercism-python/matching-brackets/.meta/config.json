@@ -1,0 +1,32 @@
+{
+  "authors": [
+    "behrtam"
+  ],
+  "contributors": [
+    "atg-abhishek",
+    "BethanyG",
+    "cmccandless",
+    "Dog",
+    "ikhadykin",
+    "kylecjo",
+    "N-Parsons",
+    "Nishant23",
+    "pheanex",
+    "thomasjpfan",
+    "tqa236",
+    "yawpitch"
+  ],
+  "files": {
+    "solution": [
+      "matching_brackets.py"
+    ],
+    "test": [
+      "matching_brackets_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Make sure the brackets and braces all match.",
+  "source": "Ginna Baker"
+}

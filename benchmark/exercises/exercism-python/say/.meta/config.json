@@ -1,0 +1,34 @@
+{
+  "authors": [
+    "behrtam"
+  ],
+  "contributors": [
+    "AndrejTS",
+    "cmccandless",
+    "csabella",
+    "Dog",
+    "fortrieb",
+    "gabriellhrn",
+    "ikhadykin",
+    "mandel01",
+    "N-Parsons",
+    "pheanex",
+    "pranasziaukas",
+    "tqa236",
+    "tsamoglou"
+  ],
+  "files": {
+    "solution": [
+      "say.py"
+    ],
+    "test": [
+      "say_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Given a number from 0 to 999,999,999,999, spell out that number in English.",
+  "source": "A variation on the JavaRanch CattleDrive, Assignment 4",
+  "source_url": "https://coderanch.com/wiki/718804"
+}

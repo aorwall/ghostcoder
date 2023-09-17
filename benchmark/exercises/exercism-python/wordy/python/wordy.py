@@ -1,0 +1,2 @@
+def answer(question):
+    pass

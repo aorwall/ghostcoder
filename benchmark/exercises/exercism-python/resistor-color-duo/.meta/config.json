@@ -1,0 +1,27 @@
+{
+  "authors": [
+    "ee7"
+  ],
+  "contributors": [
+    "alirezaghey",
+    "BethanyG",
+    "cmccandless",
+    "Dog",
+    "xitanggg",
+    "yawpitch"
+  ],
+  "files": {
+    "solution": [
+      "resistor_color_duo.py"
+    ],
+    "test": [
+      "resistor_color_duo_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Convert color codes, as used on resistors, to a numeric value.",
+  "source": "Maud de Vries, Erik Schierboom",
+  "source_url": "https://github.com/exercism/problem-specifications/issues/1464"
+}

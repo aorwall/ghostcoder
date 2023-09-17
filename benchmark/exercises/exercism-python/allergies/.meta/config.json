@@ -1,0 +1,35 @@
+{
+  "authors": [
+    "sjakobi"
+  ],
+  "contributors": [
+    "behrtam",
+    "BethanyG",
+    "cmccandless",
+    "Dog",
+    "iandexter",
+    "ikhadykin",
+    "kytrinyx",
+    "N-Parsons",
+    "olufotebig",
+    "pheanex",
+    "spencer51324312",
+    "thomasjpfan",
+    "tqa236",
+    "ZacharyRSmith"
+  ],
+  "files": {
+    "solution": [
+      "allergies.py"
+    ],
+    "test": [
+      "allergies_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Given a person's allergy score, determine whether or not they're allergic to a given item, and their full list of allergies.",
+  "source": "Exercise by the JumpstartLab team for students at The Turing School of Software and Design.",
+  "source_url": "https://turing.edu"
+}

@@ -1,0 +1,38 @@
+{%- import "generator_macros.j2" as macros with context -%}
+{{ macros.canonical_ref() }}
+
+{{ macros.header(imports = ["evaluate", "StackUnderflowError"])}}
+
+{% macro test_case(group, case) -%}
+    def test_{{ group | to_snake }}_{{ case["description"] | to_snake }}(self):
+        {%- if case is error_case %}
+        {%- if case["expected"]["error"] == "divide by zero" %}
+        # {{ case["expected"]["error"] }}
+        with self.assertRaises(ZeroDivisionError) as err:
+            {{ case["property"] }}({{ case["input"]["instructions"] }})
+        self.assertEqual(type(err.exception), ZeroDivisionError)
+        self.assertEqual(str(err.exception.args[0]), "{{ case["expected"]["error"] }}")
+        {%- else %}
+        {%- if "stack" in case["expected"]["error"] %}
+        with self.assertRaises(StackUnderflowError) as err:
+            {{ case["property"] }}({{ case["input"]["instructions"] }})
+        self.assertEqual(type(err.exception), StackUnderflowError)
+        self.assertEqual(str(err.exception.args[0]), "Insufficient number of items in stack")
+        {%- else %}
+        with self.assertRaises(ValueError) as err:
+            {{ case["property"] }}({{ case["input"]["instructions"] }})
+        self.assertEqual(type(err.exception), ValueError)
+        self.assertEqual(str(err.exception.args[0]), "{{ case["expected"]["error"] }}")
+        {%- endif %}
+        {%- endif %}
+        {%- else %}
+        self.assertEqual({{ case["property"] }}({{ case["input"]["instructions"] }}), {{ case["expected"] }})
+        {%- endif %}
+{%- endmacro %}
+
+class {{ exercise | camel_case }}Test(unittest.TestCase):
+{% for case in cases %}
+    {% for subcase in case["cases"] -%}
+    {{ test_case(case["description"], subcase) }}
+    {% endfor %}
+{% endfor %}

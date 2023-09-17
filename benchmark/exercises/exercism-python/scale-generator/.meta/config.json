@@ -1,0 +1,27 @@
+{
+  "authors": [
+    "cptjackson"
+  ],
+  "contributors": [
+    "behrtam",
+    "cmccandless",
+    "crsmi",
+    "Dog",
+    "ikhadykin",
+    "N-Parsons",
+    "nikamirrr",
+    "tqa236"
+  ],
+  "files": {
+    "solution": [
+      "scale_generator.py"
+    ],
+    "test": [
+      "scale_generator_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Generate musical scales, given a starting note and a set of intervals."
+}

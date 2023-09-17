@@ -1,0 +1,36 @@
+{
+  "authors": [
+    "betegelse"
+  ],
+  "contributors": [
+    "AnAccountForReportingBugs",
+    "beatorizu",
+    "behrtam",
+    "BethanyG",
+    "cmccandless",
+    "Dog",
+    "kytrinyx",
+    "lucasloisp",
+    "N-Parsons",
+    "Peque",
+    "pheanex",
+    "sjakobi",
+    "tqa236",
+    "twsh",
+    "yawpitch"
+  ],
+  "files": {
+    "solution": [
+      "simple_cipher.py"
+    ],
+    "test": [
+      "simple_cipher_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Implement a simple shift cipher like Caesar and a more secure substitution cipher.",
+  "source": "Substitution Cipher at Wikipedia",
+  "source_url": "https://en.wikipedia.org/wiki/Substitution_cipher"
+}

@@ -1,0 +1,30 @@
+{
+  "authors": [
+    "cptjackson"
+  ],
+  "contributors": [
+    "behrtam",
+    "cmccandless",
+    "Dog",
+    "ikhadykin",
+    "N-Parsons",
+    "nmbrgts",
+    "sjwarner-bp",
+    "thomasjpfan",
+    "tqa236",
+    "yawpitch"
+  ],
+  "files": {
+    "solution": [
+      "protein_translation.py"
+    ],
+    "test": [
+      "protein_translation_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Translate RNA sequences into proteins.",
+  "source": "Tyler Long"
+}

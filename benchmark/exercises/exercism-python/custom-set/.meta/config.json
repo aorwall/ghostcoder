@@ -1,0 +1,22 @@
+{
+  "authors": [
+    "cmccandless"
+  ],
+  "contributors": [
+    "Dog",
+    "tqa236",
+    "vigneshhari"
+  ],
+  "files": {
+    "solution": [
+      "custom_set.py"
+    ],
+    "test": [
+      "custom_set_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Create a custom set type."
+}

@@ -1,0 +1,34 @@
+{
+  "authors": [
+    "sjakobi"
+  ],
+  "contributors": [
+    "acedrew",
+    "behrtam",
+    "BethanyG",
+    "cmccandless",
+    "Dog",
+    "dvermd",
+    "ikhadykin",
+    "kytrinyx",
+    "N-Parsons",
+    "Peque",
+    "pheanex",
+    "tqa236",
+    "ZacharyRSmith"
+  ],
+  "files": {
+    "solution": [
+      "meetup.py"
+    ],
+    "test": [
+      "meetup_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Calculate the date of meetups.",
+  "source": "Jeremy Hinegardner mentioned a Boulder meetup that happens on the Wednesteenth of every month",
+  "source_url": "https://twitter.com/copiousfreetime"
+}

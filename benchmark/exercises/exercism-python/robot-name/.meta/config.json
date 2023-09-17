@@ -1,0 +1,30 @@
+{
+  "authors": [],
+  "contributors": [
+    "ariso353",
+    "behrtam",
+    "cmccandless",
+    "Dog",
+    "kytrinyx",
+    "lowks",
+    "N-Parsons",
+    "pheanex",
+    "rootulp",
+    "sjakobi",
+    "tqa236",
+    "tstirrat15"
+  ],
+  "files": {
+    "solution": [
+      "robot_name.py"
+    ],
+    "test": [
+      "robot_name_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Manage robot factory settings.",
+  "source": "A debugging session with Paul Blackwell at gSchool."
+}

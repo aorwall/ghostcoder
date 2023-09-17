@@ -1,0 +1,27 @@
+{
+  "authors": [
+    "behrtam"
+  ],
+  "contributors": [
+    "cmccandless",
+    "Dog",
+    "dvermd",
+    "josix",
+    "N-Parsons",
+    "pheanex",
+    "thomasjpfan",
+    "tqa236"
+  ],
+  "files": {
+    "solution": [
+      "word_search.py"
+    ],
+    "test": [
+      "word_search_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Create a program to solve a word search puzzle."
+}

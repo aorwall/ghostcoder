@@ -1,0 +1,34 @@
+{
+  "authors": [
+    "betegelse"
+  ],
+  "contributors": [
+    "anunciado",
+    "behrtam",
+    "cmccandless",
+    "csabella",
+    "Dog",
+    "dvermd",
+    "Grociu",
+    "ikhadykin",
+    "kytrinyx",
+    "N-Parsons",
+    "patricksjackson",
+    "Peque",
+    "pheanex",
+    "sjakobi",
+    "tqa236"
+  ],
+  "files": {
+    "solution": [
+      "sublist.py"
+    ],
+    "test": [
+      "sublist_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Write a function to determine if a list is a sublist of another list."
+}

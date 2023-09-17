@@ -1,0 +1,23 @@
+{
+  "authors": [
+    "cmccandless"
+  ],
+  "contributors": [
+    "BethanyG",
+    "Dog",
+    "IsaaG",
+    "tqa236"
+  ],
+  "files": {
+    "solution": [
+      "ledger.py"
+    ],
+    "test": [
+      "ledger_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Refactor a ledger printer."
+}

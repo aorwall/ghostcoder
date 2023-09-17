@@ -1,0 +1,34 @@
+{
+  "authors": [
+    "betegelse"
+  ],
+  "contributors": [
+    "behrtam",
+    "BethanyG",
+    "cmccandless",
+    "Dog",
+    "elyssonmr",
+    "kytrinyx",
+    "MrNaif2018",
+    "N-Parsons",
+    "pheanex",
+    "sjakobi",
+    "tqa236",
+    "yawpitch",
+    "yo-ga"
+  ],
+  "files": {
+    "solution": [
+      "crypto_square.py"
+    ],
+    "test": [
+      "crypto_square_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Implement the classic method for composing secret messages called a square code.",
+  "source": "J Dalbey's Programming Practice problems",
+  "source_url": "https://users.csc.calpoly.edu/~jdalbey/103/Projects/ProgrammingPractice.html"
+}

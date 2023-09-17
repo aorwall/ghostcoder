@@ -1,0 +1,32 @@
+{
+  "authors": [
+    "sjakobi"
+  ],
+  "contributors": [
+    "behrtam",
+    "cmccandless",
+    "crsmi",
+    "Dog",
+    "ikhadykin",
+    "kytrinyx",
+    "N-Parsons",
+    "pheanex",
+    "rohitrango",
+    "tqa236",
+    "yawpitch"
+  ],
+  "files": {
+    "solution": [
+      "series.py"
+    ],
+    "test": [
+      "series_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Given a string of digits, output all the contiguous substrings of length `n` in that string.",
+  "source": "A subset of the Problem 8 at Project Euler",
+  "source_url": "https://projecteuler.net/problem=8"
+}

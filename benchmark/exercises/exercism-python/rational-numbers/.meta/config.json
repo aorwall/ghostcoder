@@ -1,0 +1,26 @@
+{
+  "authors": [],
+  "contributors": [
+    "AnAccountForReportingBugs",
+    "BethanyG",
+    "cmccandless",
+    "Dog",
+    "GKotfis",
+    "omer-g",
+    "tqa236"
+  ],
+  "files": {
+    "solution": [
+      "rational_numbers.py"
+    ],
+    "test": [
+      "rational_numbers_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Implement rational numbers.",
+  "source": "Wikipedia",
+  "source_url": "https://en.wikipedia.org/wiki/Rational_number"
+}

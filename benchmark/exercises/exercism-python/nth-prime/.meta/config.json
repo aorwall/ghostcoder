@@ -1,0 +1,34 @@
+{
+  "authors": [
+    "sjakobi"
+  ],
+  "contributors": [
+    "behrtam",
+    "BethanyG",
+    "cmccandless",
+    "Dog",
+    "ikhadykin",
+    "jandersoncampelo",
+    "kytrinyx",
+    "N-Parsons",
+    "pheanex",
+    "robkeim",
+    "smalley",
+    "tqa236",
+    "yawpitch"
+  ],
+  "files": {
+    "solution": [
+      "nth_prime.py"
+    ],
+    "test": [
+      "nth_prime_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Given a number n, determine what the nth prime is.",
+  "source": "A variation on Problem 7 at Project Euler",
+  "source_url": "https://projecteuler.net/problem=7"
+}

@@ -1,0 +1,28 @@
+{
+  "authors": [
+    "behrtam"
+  ],
+  "contributors": [
+    "cmccandless",
+    "Dog",
+    "frerich",
+    "Mofeywalker",
+    "N-Parsons",
+    "pheanex",
+    "tqa236",
+    "meatball133"
+  ],
+  "files": {
+    "solution": [
+      "linked_list.py"
+    ],
+    "test": [
+      "linked_list_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Implement a doubly linked list.",
+  "source": "Classic computer science topic"
+}

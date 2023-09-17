@@ -1,0 +1,38 @@
+{
+  "authors": [],
+  "contributors": [
+    "behrtam",
+    "cmccandless",
+    "crazymykl",
+    "Dog",
+    "dotrungkien",
+    "henrik",
+    "ikhadykin",
+    "kytrinyx",
+    "lowks",
+    "markijbema",
+    "N-Parsons",
+    "n1k0",
+    "pheanex",
+    "roadfoodr",
+    "sjakobi",
+    "thomasjpfan",
+    "tqa236",
+    "vgerak",
+    "yawpitch"
+  ],
+  "files": {
+    "solution": [
+      "anagram.py"
+    ],
+    "test": [
+      "anagram_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Given a word and a list of possible anagrams, select the correct sublist.",
+  "source": "Inspired by the Extreme Startup game",
+  "source_url": "https://github.com/rchatley/extreme_startup"
+}

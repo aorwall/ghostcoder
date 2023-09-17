@@ -1,0 +1,23 @@
+{
+  "authors": [
+    "AnAccountForReportingBugs"
+  ],
+  "contributors": [
+    "cmccandless"
+  ],
+  "files": {
+    "solution": [
+      "paasio.py"
+    ],
+    "test": [
+      "paasio_test.py",
+      "test_utils.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Report network IO statistics.",
+  "source": "Brian Matsuo",
+  "source_url": "https://github.com/bmatsuo"
+}

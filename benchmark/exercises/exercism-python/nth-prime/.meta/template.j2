@@ -1,0 +1,37 @@
+{%- import "generator_macros.j2" as macros with context -%}
+{{ macros.canonical_ref() }}
+
+{{ macros.header()}}
+
+{% macro test_case(case) -%}
+    {%- set input = case["input"] -%}
+    def test_{{ case["description"] | to_snake }}(self):
+        {% if case is error_case -%}
+          with self.assertRaises(ValueError) as err:
+                {{ case["property"] | to_snake }}({{ input["number"] }})
+        self.assertEqual(type(err.exception), ValueError)
+        self.assertEqual(err.exception.args[0], "{{ case["expected"]["error"] }}")
+        {% else -%}
+          self.assertEqual(
+                {{ case["property"] | to_snake }}({{ input["number"] }}),
+                {{ case["expected"] }}
+            )
+        {%- endif %}
+{%- endmacro %}
+
+def prime_range(n):
+    """Returns a list of the first n primes"""
+    return [prime(i) for i in range(1, n + 1)]
+
+class {{ exercise | camel_case }}Test(unittest.TestCase):
+    {% for case in cases -%}       
+    {{ test_case(case) }}
+    {% endfor %}
+    {% if additional_cases | length -%}
+
+    # Additional tests for this track
+
+    {% for case in additional_cases -%}
+    {{ test_case(case) }}
+    {% endfor %}
+    {%- endif %}

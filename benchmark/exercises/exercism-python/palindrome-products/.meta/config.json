@@ -1,0 +1,35 @@
+{
+  "authors": [
+    "sjakobi"
+  ],
+  "contributors": [
+    "AnAccountForReportingBugs",
+    "behrtam",
+    "BethanyG",
+    "cmccandless",
+    "deep110",
+    "Dog",
+    "emerali",
+    "gabriel376",
+    "ikhadykin",
+    "kytrinyx",
+    "N-Parsons",
+    "pheanex",
+    "pywkm",
+    "tqa236"
+  ],
+  "files": {
+    "solution": [
+      "palindrome_products.py"
+    ],
+    "test": [
+      "palindrome_products_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Detect palindrome products in a given range.",
+  "source": "Problem 4 at Project Euler",
+  "source_url": "https://projecteuler.net/problem=4"
+}

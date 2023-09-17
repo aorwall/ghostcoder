@@ -1,0 +1,33 @@
+{
+  "authors": [
+    "sjakobi"
+  ],
+  "contributors": [
+    "AnAccountForReportingBugs",
+    "behrtam",
+    "BethanyG",
+    "cmccandless",
+    "danishprakash",
+    "Dog",
+    "kytrinyx",
+    "N-Parsons",
+    "pheanex",
+    "simmol",
+    "tqa236",
+    "yawpitch"
+  ],
+  "files": {
+    "solution": [
+      "matrix.py"
+    ],
+    "test": [
+      "matrix_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Given a string representing a matrix of numbers, return the rows and columns of that matrix.",
+  "source": "Exercise by the JumpstartLab team for students at The Turing School of Software and Design.",
+  "source_url": "https://turing.edu"
+}

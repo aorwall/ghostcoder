@@ -1,0 +1,30 @@
+{
+  "authors": [
+    "behrtam"
+  ],
+  "contributors": [
+    "BethanyG",
+    "cmccandless",
+    "Dog",
+    "dvermd",
+    "gabriel376",
+    "IsaacG",
+    "N-Parsons",
+    "pheanex",
+    "rootulp",
+    "thomasjpfan",
+    "tqa236"
+  ],
+  "files": {
+    "solution": [
+      "list_ops.py"
+    ],
+    "test": [
+      "list_ops_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Implement basic list operations."
+}

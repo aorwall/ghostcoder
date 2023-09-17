@@ -1,0 +1,43 @@
+{%- import "generator_macros.j2" as macros with context -%}
+{{ macros.canonical_ref() }}
+
+{{ macros.header()}}
+
+{% macro test_case(case) -%}
+    {%- set input = case["input"] -%}
+    {%- set expected = case["expected"] -%}
+    def test_{{ case["description"] | to_snake }}(self):
+        {% if input["matrix"][0] -%}
+        matrix = {{ input["matrix"] }}
+        {% else -%}
+        matrix = []
+        {% endif -%}
+        {% if case is error_case -%}
+        with self.assertRaises(ValueError) as err:
+            {{- case["property"] | to_snake }}(matrix)
+        self.assertEqual(type(err.exception), ValueError)
+        self.assertEqual(err.exception.args[0], "{{ case["expected"]["error"] }}")
+        {% else -%}
+        self.assertEqual(
+        sorted_points({{ case["property"] | to_snake }}(matrix)),
+        sorted_points({{ expected }})
+        )
+        {% endif -%}
+{% endmacro -%}
+
+
+def sorted_points(point_list):
+    return sorted(point_list, key=lambda p: (p["row"], p["column"]))
+
+class {{ exercise | camel_case }}Test(unittest.TestCase):
+    {% for case in cases -%}
+    {{ test_case(case) }}
+    {% endfor %}
+
+    # Additional tests for this track
+
+    {% if additional_cases | length -%}
+    {% for case in additional_cases -%}
+    {{ test_case(case) }}
+    {% endfor %}
+    {%- endif %}

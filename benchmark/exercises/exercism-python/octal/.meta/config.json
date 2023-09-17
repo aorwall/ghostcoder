@@ -1,0 +1,30 @@
+{
+  "blurb": "Convert a octal number, represented as a string (e.g. '1735263'), to its decimal equivalent using first principles (i.e. no, you may not use built-in or external libraries to accomplish the conversion).",
+  "authors": [
+    "sjakobi"
+  ],
+  "contributors": [
+    "behrtam",
+    "cmccandless",
+    "Dog",
+    "ikhadykin",
+    "jesserizzo",
+    "kytrinyx",
+    "N-Parsons",
+    "pheanex",
+    "tqa236"
+  ],
+  "files": {
+    "solution": [
+      "octal.py"
+    ],
+    "test": [
+      "octal_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "source": "All of Computer Science",
+  "source_url": "https://www.wolframalpha.com/examples/mathematics/numbers/base-conversions"
+}

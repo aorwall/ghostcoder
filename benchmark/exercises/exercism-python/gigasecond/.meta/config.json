@@ -1,0 +1,35 @@
+{
+  "authors": [],
+  "contributors": [
+    "behrtam",
+    "BethanyG",
+    "cmccandless",
+    "Dog",
+    "etrepum",
+    "GascaK",
+    "ikhadykin",
+    "kytrinyx",
+    "lowks",
+    "N-Parsons",
+    "pamtdoh",
+    "pheanex",
+    "sjakobi",
+    "tqa236",
+    "yawpitch",
+    "AndrewLawendy"
+  ],
+  "files": {
+    "solution": [
+      "gigasecond.py"
+    ],
+    "test": [
+      "gigasecond_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Given a moment, determine the moment that would be after a gigasecond has passed.",
+  "source": "Chapter 9 in Chris Pine's online Learn to Program tutorial.",
+  "source_url": "https://pine.fm/LearnToProgram/?Chapter=09"
+}

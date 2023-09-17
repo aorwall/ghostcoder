@@ -1,0 +1,23 @@
+{
+  "blurb": "Implement various kinds of error handling and resource management.",
+  "authors": [
+    "cmccandless"
+  ],
+  "contributors": [
+    "BethanyG",
+    "Dog",
+    "N-Parsons",
+    "tqa236"
+  ],
+  "files": {
+    "solution": [
+      "error_handling.py"
+    ],
+    "test": [
+      "error_handling_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  }
+}

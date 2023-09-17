@@ -1,0 +1,35 @@
+{
+  "authors": [
+    "michaelkunc"
+  ],
+  "contributors": [
+    "AnAccountForReportingBugs",
+    "behrtam",
+    "BethanyG",
+    "cmccandless",
+    "Dog",
+    "fortrieb",
+    "ikhadykin",
+    "kytrinyx",
+    "mpatibandla",
+    "N-Parsons",
+    "patricksjackson",
+    "pheanex",
+    "subkrish",
+    "tqa236"
+  ],
+  "files": {
+    "solution": [
+      "binary_search.py"
+    ],
+    "test": [
+      "binary_search_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Implement a binary search algorithm.",
+  "source": "Wikipedia",
+  "source_url": "https://en.wikipedia.org/wiki/Binary_search_algorithm"
+}

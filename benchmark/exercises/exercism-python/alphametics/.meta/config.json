@@ -1,0 +1,31 @@
+{
+  "authors": [
+    "behrtam"
+  ],
+  "contributors": [
+    "BethanyG",
+    "cmccandless",
+    "Dog",
+    "iandexter",
+    "ikhadykin",
+    "N-Parsons",
+    "nikamirrr",
+    "rfuentescruz",
+    "sukovanej",
+    "tqa236",
+    "yawpitch"
+  ],
+  "files": {
+    "solution": [
+      "alphametics.py"
+    ],
+    "test": [
+      "alphametics_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "test_runner": false,
+  "blurb": "Write a function to solve alphametics puzzles."
+}

@@ -1,0 +1,35 @@
+{
+  "authors": [
+    "chrisftw"
+  ],
+  "contributors": [
+    "behrtam",
+    "cmccandless",
+    "Dog",
+    "GascaK",
+    "guaneec",
+    "ikhadykin",
+    "Mofeywalker",
+    "N-Parsons",
+    "pheanex",
+    "rootulp",
+    "smalley",
+    "thomasjpfan",
+    "tqa236",
+    "chrismay"
+  ],
+  "files": {
+    "solution": [
+      "clock.py"
+    ],
+    "test": [
+      "clock_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Implement a clock that handles times without dates.",
+  "source": "Pairing session with Erin Drummond",
+  "source_url": "https://twitter.com/ebdrummond"
+}

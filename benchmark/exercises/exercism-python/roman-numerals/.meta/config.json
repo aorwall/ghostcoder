@@ -1,0 +1,32 @@
+{
+  "authors": [],
+  "contributors": [
+    "behrtam",
+    "BethanyG",
+    "cmccandless",
+    "Dog",
+    "dotrungkien",
+    "ikhadykin",
+    "kytrinyx",
+    "lowks",
+    "mpatibandla",
+    "N-Parsons",
+    "pheanex",
+    "sjakobi",
+    "tqa236"
+  ],
+  "files": {
+    "solution": [
+      "roman_numerals.py"
+    ],
+    "test": [
+      "roman_numerals_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Write a function to convert from normal numbers to Roman Numerals.",
+  "source": "The Roman Numeral Kata",
+  "source_url": "https://codingdojo.org/kata/RomanNumerals/"
+}

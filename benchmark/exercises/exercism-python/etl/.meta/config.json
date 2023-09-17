@@ -1,0 +1,33 @@
+{
+  "authors": [],
+  "contributors": [
+    "alirezaghey",
+    "behrtam",
+    "cmccandless",
+    "Dog",
+    "etrepum",
+    "ikhadykin",
+    "kytrinyx",
+    "lowks",
+    "Mofeywalker",
+    "N-Parsons",
+    "pheanex",
+    "sjakobi",
+    "tqa236",
+    "yawpitch"
+  ],
+  "files": {
+    "solution": [
+      "etl.py"
+    ],
+    "test": [
+      "etl_test.py"
+    ],
+    "example": [
+      ".meta/example.py"
+    ]
+  },
+  "blurb": "Change the data format for scoring a game to more easily add other languages.",
+  "source": "Based on an exercise by the JumpstartLab team for students at The Turing School of Software and Design.",
+  "source_url": "https://turing.edu"
+}
