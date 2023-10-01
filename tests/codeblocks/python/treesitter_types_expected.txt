@@ -1,0 +1,126 @@
+ 0 module ``
+  1 import `from __future__ import print_function`
+  1 import `import os as operating_system`
+  1 import `from .`
+   2 code `import`
+   2 code `my_module`
+  1 import `from math`
+   2 code `import`
+   2 code `*`
+  1 comment `# print_statement`
+  1 code `print("Hello, World!")`
+  1 comment `# assert_statement`
+  1 code `assert 1 == 1, "This should not fail"`
+  1 comment `# expression_statement`
+  1 comment `# named_expression`
+  1 code `x`
+   2 code `=`
+   2 code `(y := 20)`
+  1 comment `# return_statement`
+  1 function `def func():`
+   2 code `return`
+    3 code `x`
+  1 comment `# delete_statement`
+  1 code `del x`
+  1 comment `# raise_statement`
+  1 code `raise Exception("An error occurred")`
+  1 comment `# pass_statement`
+  1 code `pass`
+  1 comment `# break_statement`
+  1 statement `for i in range(10):`
+   2 statement `if i == 5:`
+    3 code `break`
+  1 comment `# continue_statement`
+  1 statement `for i in range(10):`
+   2 statement `if i == 5:`
+    3 code `continue`
+  1 comment `# _compound_statement`
+  1 comment `# if_statement`
+  1 comment `# elif_clause`
+  1 comment `# else_clause`
+  1 statement `if x > 10:`
+   2 code `print("x is greater than 10")`
+   2 statement `elif x == 10:`
+    3 code `print("x is 10")`
+   2 statement `else:`
+    3 code `print("x is less than 10")`
+  1 comment `# for_statement`
+  1 statement `for i in range(10):`
+   2 code `print(i)`
+  1 comment `# while_statement`
+  1 statement `while x > 0:`
+   2 code `x -= 1`
+  1 comment `# try_statement`
+  1 comment `# except_clause`
+  1 comment `# except_group_clause`
+  1 comment `# finally_clause`
+  1 statement `try:`
+   2 code `x`
+    3 code `=`
+    3 code `1 / 0`
+  1 statement `except ZeroDivisionError:`
+   2 code `print("Cannot divide by zero")`
+  1 statement `finally:`
+   2 code `print("End of try block")`
+  1 comment `# with_statement`
+  1 comment `# with_clause`
+  1 comment `# with_item`
+  1 statement `with open('file.txt', 'r') as file:`
+   2 code `content`
+    3 code `=`
+    3 code `file.read()`
+  1 comment `# function_definition`
+  1 comment `# parameters`
+  1 comment `# lambda_parameters`
+  1 comment `# list_splat`
+  1 comment `# dictionary_splat`
+  1 function `def func(x, *args, **kwargs):`
+   2 code `print(x, args, kwargs)`
+  1 comment `# global_statement`
+  1 code `global x`
+  1 comment `# nonlocal_statement`
+  1 function `def outer():`
+   2 code `x`
+    3 code `=`
+    3 code `10`
+   2 function `def inner():`
+    3 code `nonlocal x`
+    3 code `x`
+     4 code `=`
+     4 code `20`
+   2 code `inner()`
+   2 code `print(x)`
+  1 comment `# exec_statement`
+  1 code `exec('print("Hello, World!")')`
+  1 comment `# type_alias_statement`
+  1 code `Url`
+   2 code `=`
+   2 code `str`
+  1 comment `# class_definition`
+  1 comment `# type_parameter`
+  1 class `class MyClass:`
+   2 code `pass`
+  1 comment `# argument_list`
+  1 code `func(10, 20, 30, a=1, b=2, c=3)`
+  1 comment `# decorated_definition`
+  1 comment `# decorator`
+  1 function `@staticmethod\ndef my_func():`
+   2 code `pass`
+  1 comment `# block`
+  1 code `{`
+  1 code `"key"`
+   2 block_delimiter `:`
+   2 code `"value"`
+  1 code `}`
+  1 comment `# expression_list`
+  1 code `1`
+  1 code `,`
+  1 code `2`
+  1 code `,`
+  1 code `3`
+  1 code `,`
+  1 code `4`
+  1 code `,`
+  1 code `5`
+  1 comment `# dotted_name`
+  1 code `os.path.join`

@@ -2,19 +2,21 @@ import difflib
 import logging
 import re
 from dataclasses import dataclass
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Any
 from typing import Optional
+from uuid import UUID
 
-from pydantic import BaseModel, Field
+from langchain.callbacks.base import BaseCallbackHandler
+from langchain.schema.output import GenerationChunk, ChatGenerationChunk
 
-from codeblocks import create_parser, CodeBlockType
 from ghostcoder.actions.base import BaseAction
-from ghostcoder.actions.write_code.prompt import get_implement_prompt, FEW_SHOT_PYTHON_1, ROLE_PROMPT, FEW_SHOTS_PYTHON
+from ghostcoder.actions.write_code.prompt import get_implement_prompt, ROLE_PROMPT, FEW_SHOTS_PYTHON
+from ghostcoder.codeblocks import create_parser, CodeBlockType
 from ghostcoder.filerepository import FileRepository
+from ghostcoder.ipython_callback import DisplayCallback
 from ghostcoder.llm.base import LLMWrapper
 from ghostcoder.schema import Message, FileItem, Stats, TextItem, UpdatedFileItem, CodeItem
 from ghostcoder.utils import is_complete
-from ghostcoder.verify.verifier import Verifier
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +27,35 @@ class CodeBlock:
     file_path: str = None
 
 
+class StreamCallback(BaseCallbackHandler):
+
+    def __init__(self, callback: DisplayCallback):
+        self.callback = callback
+
+    def on_llm_new_token(
+        self,
+        token: str,
+        *,
+        chunk: Optional[Union[GenerationChunk, ChatGenerationChunk]] = None,
+        run_id: UUID,
+        parent_run_id: Optional[UUID] = None,
+        **kwargs: Any,
+    ) -> Any:
+        if self.callback:
+            self.callback.ai_stream(token)
+
+
 def get_file_item(items: list, file_path: str):
-    for item in items:
-        if isinstance(item, FileItem) and item.file_path == file_path:
-            return item
-        if isinstance(item, UpdatedFileItem) and item.file_path == file_path:
-            return item
+    equal_match = [item for item in items if "file" in item.type and item.file_path == file_path]
+    if equal_match:
+        return equal_match[0]
+
+    similar_matches = [item for item in items if "file" in item.type and file_path in item.file_path]
+    if len(similar_matches) == 1:
+        return similar_matches[0]
+    else:
+        logger.info(f"Found {len(similar_matches)} similar matches for {file_path}: {similar_matches}, expected one")
+
     return None
 
 
@@ -54,7 +79,7 @@ def extract_response_parts(response: str) -> List[Union[str, CodeBlock]]:
     [/LANGUAGE]
 
 
-    Parameters:
+    Parameters:s
     text (str): The input string containing code blocks and text
 
     Returns:
@@ -77,7 +102,7 @@ def extract_response_parts(response: str) -> List[Union[str, CodeBlock]]:
     file_pattern = re.compile(r"`([\w/]+\.\w{1,4})`")
 
     # Pattern to check if the filename stands alone on the last line
-    standalone_file_pattern = re.compile(r'^(?:"|`)?(?P<filename>[\w/]+\.\w{1,4})(?:"|`)?$')
+    standalone_file_pattern = re.compile(r'^(?:"|`)?(?P<filename>[\w\s\-/\\]+\.\w{1,4})(?:"|`)?$', re.IGNORECASE)
 
     last_end = 0
 
@@ -133,8 +158,6 @@ def extract_response_parts(response: str) -> List[Union[str, CodeBlock]]:
     return combined_parts
 
 
-
-
 def do_diff(file_path: str, original_content: str, updated_content: str) -> Optional[str]:
     return "".join(difflib.unified_diff(
         original_content.strip().splitlines(True),
@@ -142,7 +165,7 @@ def do_diff(file_path: str, original_content: str, updated_content: str) -> Opti
         fromfile=file_path, tofile=file_path, lineterm="\n"))
 
 
-class WriteCodeAction(BaseAction):
+class CodeWriter(BaseAction):
 
     def __init__(self,
                  llm: LLMWrapper,
@@ -155,8 +178,8 @@ class WriteCodeAction(BaseAction):
                  guess_similar_files: bool = True,
                  expect_one_file: bool = False,
                  allow_hallucinated_files: bool = False,
-                 tries: int = 2,
-                 verifier: Optional[Verifier] = None):
+                 callback: DisplayCallback = None,
+                 tries: int = 2):
         if not sys_prompt:
             sys_prompt = get_implement_prompt(sys_prompt_id)
         super().__init__(llm, sys_prompt)
@@ -169,23 +192,11 @@ class WriteCodeAction(BaseAction):
         self.guess_similar_files = guess_similar_files
         self.expect_one_file = expect_one_file
         self.allow_hallucinations = allow_hallucinated_files
-        self.verifier = verifier
+        self.callback = callback
 
-    def execute(self, message: Message, message_history: List[Message] = []) -> List[Message]:
-        file_items = message.find_items_by_type(item_type="file")
-        for file_item in file_items:
-            if not file_item.content and self.repository:
-                logger.debug(f"Get current file content for {file_item.file_path}")
-                content = self.repository.get_file_content(file_path=file_item.file_path)
-                if content:
-                    file_item.content = content
-                else:
-                    logger.debug(f"Could not find file {file_item.file_path} in repository, "
-                                 f"will assume it's a request to create a new file")
-                    file_item.content = ""
-
-        ai_messages = self._execute(messages=[message], message_history=message_history, retry=0)
-        stats = [msg.stats for msg in ai_messages if msg.stats]
+    def execute(self, incoming_messages: List[Message]) -> List[Message]:
+        outgoing_messages = self._execute(incoming_messages=incoming_messages, retry=0)
+        stats = [msg.stats for msg in outgoing_messages if msg.stats]
         use_log = ""
         if stats:
             total_usage = sum(stats[1:], stats[0])
@@ -193,15 +204,19 @@ class WriteCodeAction(BaseAction):
             if total_usage.total_cost:
                 use_log += f"Total cost: {total_usage.total_cost}. "
 
-        logger.info(f"Finished executing with {len(ai_messages)} messages. {use_log}")
+        logger.info(f"Finished executing with {len(outgoing_messages)} messages. {use_log}")
+        return outgoing_messages
 
-        return ai_messages
-
-    def _execute(self, messages: [Message], message_history: List[Message] = None, retry: int = 0) -> List[Message]:
+    def _execute(self, incoming_messages: List[Message], retry: int = 0) -> List[Message]:
         file_items = []
-        for message in messages:
+        for message in incoming_messages:
             file_items_in_message = message.find_items_by_type(item_type="file")
             file_items.extend(file_items_in_message)
+
+            updated_files = message.find_items_by_type(item_type="updated_file")
+            for updated_file in updated_files:
+                if not updated_file.invalid:
+                    file_items.append(updated_file)
 
         if file_items:
             incoming_files = ""
@@ -211,7 +226,11 @@ class WriteCodeAction(BaseAction):
         else:
             logger.info(f"No incoming files")
 
-        result, stats = self.generate(messages=messages, history=message_history)
+        try:
+            result, stats = self.generate(messages=incoming_messages, callback=StreamCallback(callback=self.callback))
+        except Exception as e: # TODO: Handle context_length_exceeded...
+            return [Message(sender="Ghostcoder", items=[TextItem(text=str(e))])]
+
         blocks = extract_response_parts(result)
 
         retry_inputs = []
@@ -238,9 +257,20 @@ class WriteCodeAction(BaseAction):
                         block.file_path = file_items[0].file_path
 
                 if block.file_path:
-                    updated_file_item, retry_inputs_for_file = self.updated_file(stats, block, file_items)
+                    already_updated_file_item = get_file_item(items, block.file_path)
+                    if not already_updated_file_item:
+                        original_file_item = get_file_item(file_items, block.file_path)
+
+                    updated_file_item, retry_inputs_for_file = self.updated_file(
+                        stats,
+                        block,
+                        already_updated_file_item or original_file_item,
+                        file_items)
                     retry_inputs.extend(retry_inputs_for_file)
-                    if updated_file_item:
+
+                    if already_updated_file_item and not updated_file_item.invalid:
+                        already_updated_file_item.content = updated_file_item.content
+                    elif updated_file_item:
                         items.append(updated_file_item)
                 else:
                     items.append(CodeItem(content=block.content, language=block.language))
@@ -263,6 +293,7 @@ class WriteCodeAction(BaseAction):
                     try:
                         diff = self.repository.update_file(item.file_path, item.content)
                         did_changes = bool(diff)
+                        item.diff = diff
                         if not did_changes:
                             item.invalid = "no_change"
                     except Exception as e:
@@ -277,32 +308,29 @@ class WriteCodeAction(BaseAction):
             logger.info(f"No updated files")
 
         ai_message = Message(sender="AI", items=items, stats=stats)
-        ai_messages = [ai_message]
 
-        if self.auto_mode and self.verifier and did_changes:
-            verification_result = self.verifier.verify()
-            if not verification_result.success:
-                retry_input = TextItem(text=verification_result.message)
-                retry_message = Message(
-                    sender="Human",
-                    items=[retry_input] + verification_result.failures,
-                    auto=True
-                )
-                ai_messages.append(retry_message)
-                if retry < self.tries:
-                    logger.info(f"Retrying execution (try: {retry}/{self.tries})")
-                    ai_messages.extend(self._execute(messages=messages + ai_messages, message_history=message_history, retry=retry + 1))
+        if self.callback:
+            self.callback.display_message(ai_message)
+
+        outgoing_messages = [ai_message]
 
         if self.auto_mode and retry_inputs:
             retry += 1
-            retry_message = Message(sender="Human", items=retry_inputs, auto=True)
+            retry_message = Message(sender="Ghostcoder", items=retry_inputs, auto=True)
+
+            if self.callback:
+                self.callback.display_message(retry_message)
+
             logger.info(f"Found invalid input in the response.\n {retry_message.to_prompt()}")
-            ai_messages.append(retry_message)
+            outgoing_messages.append(retry_message)
+
             if retry < self.tries:
                 logger.info(f"Retrying execution (try: {retry}/{self.tries})")
-                ai_messages.extend(self._execute(messages=messages + ai_messages, message_history=message_history, retry=retry + 1))
+                outgoing_messages.extend(self._execute(
+                    incoming_messages=incoming_messages + outgoing_messages,
+                    retry=retry + 1))
 
-        return ai_messages
+        return outgoing_messages
 
     def set_file_path_to_block(self, block: CodeBlock, file_items: List[FileItem], stats: Stats):
         """Tries to find a file item that matches the code block."""
@@ -338,10 +366,9 @@ class WriteCodeAction(BaseAction):
                 logger.warning(
                     f"Could not parse file with {file_item.language} or code block with language {block.language}: {e}")
 
-    def updated_file(self, stats: Stats, block: CodeBlock, file_items: List[FileItem]) -> Tuple[Optional[UpdatedFileItem], List[TextItem]]:
+    def updated_file(self, stats: Stats, block: CodeBlock, existing_file_item: FileItem, file_items: List[FileItem]) -> Tuple[Optional[UpdatedFileItem], List[TextItem]]:
         logger.debug("Received file block: [{}]".format(block.file_path))
         stats.increment("file_item")
-        original_file_item = get_file_item(file_items, block.file_path)
 
         retry_inputs = []
 
@@ -351,16 +378,16 @@ class WriteCodeAction(BaseAction):
         new = False
 
         # Don't merge and mark as invalid if the file is readonly
-        if original_file_item and original_file_item.readonly:
+        if existing_file_item and existing_file_item.readonly:
             return UpdatedFileItem(
-                file_path=block.file_path,
+                file_path=existing_file_item.file_path,
                 content=updated_content,
                 invalid="readonly",
             ), retry_inputs
 
         # Don't merge and mark as invalid if hallucinated files isn't allowed
-        if not original_file_item and not self.allow_hallucinations:
-            logger.warning(f"Could not find file {block.file_path} in initial message")
+        if not existing_file_item and not self.allow_hallucinations:
+            logger.info(f"Could not find file {block.file_path} in initial message")
             stats.increment("missing_file")
             available_files = ", ".join([f"`{f.file_path}`" for f in file_items])
             retry_inputs.append(TextItem(text=f"I only expected the following files in the response {available_files}. "
@@ -372,9 +399,9 @@ class WriteCodeAction(BaseAction):
             ), retry_inputs
 
         # Just return the updated content if original file is empty
-        if not original_file_item.content:
+        if existing_file_item and not existing_file_item.content:
             return UpdatedFileItem(
-                file_path=block.file_path,
+                file_path=existing_file_item.file_path,
                 content=updated_content
             ), retry_inputs
 
@@ -404,8 +431,8 @@ class WriteCodeAction(BaseAction):
                 for error_block in error_blocks:
                     retry_inputs.append(
                         CodeItem(language=block.language, content=error_block.to_string()))
-            elif original_file_item and not original_file_item.readonly:
-                original_block = parser.parse(original_file_item.content)
+            elif existing_file_item and not existing_file_item.readonly:
+                original_block = parser.parse(existing_file_item.content)
                 gpt_tweaks = original_block.merge(updated_block, first_level=True)
 
                 stats.increment("merged_file")
@@ -433,19 +460,18 @@ class WriteCodeAction(BaseAction):
                 TextItem(text=f"Return all code from the original code in the update file {block.file_path}."))
             invalid = "not_complete"
 
-        if original_file_item:
-            diff = do_diff(file_path=block.file_path, original_content=original_file_item.content,
+        if existing_file_item:
+            block.file_path = existing_file_item.file_path
+            diff = do_diff(file_path=block.file_path, original_content=existing_file_item.content,
                            updated_content=updated_content)
             if not diff:
                 invalid = "no_change"
                 stats.increment("no_change")
 
-            if original_file_item.readonly:
+            if existing_file_item.readonly:
                 invalid = "readonly"
                 stats.increment("updated_readonly_file")
 
-            if not invalid:
-                original_file_item.content = updated_content
         elif self.repository.get_file_content(block.file_path):
             # TODO: Check in context if the file is mentioned or listed in earlier messages
             logger.info(f"{block.file_path} not found in initial message but exists in repo, will assume"
@@ -478,7 +504,7 @@ class WriteCodeAction(BaseAction):
 
         return False
 
-    def generate(self, messages: List[Message], history: List[Message] = []) -> (str, Stats):
+    def generate(self, messages: List[Message], callback: BaseCallbackHandler = None) -> (str, Stats):
         sys_prompt = ""
         if self.role_prompt:
             sys_prompt += self.role_prompt + "\n"
@@ -489,4 +515,4 @@ class WriteCodeAction(BaseAction):
 
         if self.few_shot_prompt:
             sys_prompt += "\n" + self.llm.messages_to_prompt(messages=FEW_SHOTS_PYTHON, few_shot_example=True)
-        return self.llm.generate(sys_prompt, history + messages)
+        return self.llm.generate(sys_prompt, messages, callback=callback)

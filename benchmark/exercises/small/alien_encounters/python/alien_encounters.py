@@ -1,15 +1,15 @@
 def resize_matrix(matrix, length):
-    # Copy the matrix to avoid modifying the original
-    matrix_copy = matrix.copy()
+    """
+    Resize the given matrix to the specified length.
 
-    # If the matrix is too long, remove rows from the end
-    if len(matrix_copy) > length:
-        matrix_copy = matrix_copy[:length]
-    # If the matrix is too short, add rows filled with zeros at the end
-    elif len(matrix_copy) < length:
-        # Special case: if the matrix is empty, assume it should have one column
-        num_columns = len(matrix_copy[0]) if matrix_copy else 1
-        while len(matrix_copy) < length:
-            matrix_copy.append([0]*num_columns)
+    If the matrix is too long, remove rows from the end.
+    If the matrix is too short, add rows filled with zeros at the end.
 
-    return matrix_copy
+    Parameters:
+    - matrix (List[List[int]]): The matrix to be resized.
+    - length (int): The desired number of rows in the matrix.
+
+    Returns:
+    - List[List[int]]: The resized matrix.
+    """
+    pass

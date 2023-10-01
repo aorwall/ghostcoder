@@ -1,0 +1,30 @@
+from typing import Dict, List
+from .abstract_battleship import AbstractBattleship, Game, ShipPlacement, Turn, TurnResponse
+
+class Battleship(AbstractBattleship):
+    def __init__(self):
+        self.games: Dict[str, Game] = {}
+
+    def create_game(self, game_id: str, players: List[str]) -> None:
+        if game_id in self.games:
+            raise ValueError(f"Game with id {game_id} already exists.")
+
+        board = [["" for _ in range(10)] for _ in range(10)]
+        self.games[game_id] = Game(game_id=game_id, players=players, board=board, ships=[], turns=[])
+
+    def create_turn(self, game_id: str, turn: Turn) -> TurnResponse:
+        game = self.games.get(game_id)
+        if not game:
+            raise ValueError(f"Game with id {game_id} does not exist.")
+
+        row, column = turn.target["row"] - 1, ord(turn.target["column"]) - ord("A")
+        if game.board[row][column] == "":
+            result = "miss"
+            ship_type = None
+        else:
+            result = "hit"
+            ship_type = game.board[row][column]
+            game.board[row][column] = ""
+
+        game.turns.append(turn)
+        return TurnResponse(result=result, ship_type=ship_type)

@@ -1,0 +1,44 @@
+import time
+import unittest
+from manufacturing_production import ProductionLine, Station
+
+class TestProductionLine(unittest.TestCase):
+    def setUp(self):
+        self.stations = [Station("Manufacturing", 1), Station("Quality Control", 1), Station("Packaging", 1), Station("Shipping", 1)]
+        self.production_line = ProductionLine(self.stations)
+
+    def test_add_item(self):
+        self.production_line.add_item("Item1")
+        self.assertEqual(self.production_line.items, ["Item1"])
+
+    def test_process_item(self):
+        self.production_line.add_item("Item1")
+        self.production_line.process_item("Item1", self.stations[0])
+        self.assertNotIn("Item1", self.production_line.items)
+
+    def test_toggle_pause(self):
+        self.production_line.toggle_pause()
+        self.assertEqual(self.production_line.pause, True)
+        self.production_line.toggle_pause()
+        self.assertEqual(self.production_line.pause, False)
+
+    # Add test case for run method
+    def test_run(self):
+        self.production_line.add_item("Item1")
+        self.production_line.run()
+        time.sleep(5)  # Wait for all threads to finish
+        self.assertEqual(self.production_line.items, [])
+
+    # Add test case for pause and resume feature
+    def test_pause_and_resume(self):
+        self.production_line.add_item("Item1")
+        self.production_line.toggle_pause()
+        self.production_line.run()
+        time.sleep(1)  # Wait for the pause to take effect
+        self.assertEqual(self.production_line.items, ["Item1"])
+        self.production_line.toggle_pause()
+        time.sleep(5)  # Wait for all threads to finish
+        self.assertEqual(self.production_line.items, [])
+
+if __name__ == '__main__':
+    unittest.main()

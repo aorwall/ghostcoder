@@ -4,7 +4,7 @@ from typing import List, Any
 from langchain.llms.base import create_base_retry_decorator
 
 from ghostcoder.llm.base import LLMWrapper
-from ghostcoder.schema import Message, Stats, FileItem
+from ghostcoder.schema import Message, Stats
 
 
 class PhindLLMWrapper(LLMWrapper):

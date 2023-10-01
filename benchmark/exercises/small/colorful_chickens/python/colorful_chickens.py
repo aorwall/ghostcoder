@@ -1,13 +1,11 @@
-def chicken_color_group(color_description):
-    red_group = ['apple', 'rose', 'tomato']
-    green_group = ['leaf', 'grass', 'lime']
-    blue_group = ['sky', 'ocean', 'blueberry']
+def chicken_color_group(color_description: str) -> str:
+    """
+    Classify the chicken into a color group based on the color description.
 
-    if color_description in red_group:
-        return 'Red Group'
-    elif color_description in green_group:
-        return 'Green Group'
-    elif color_description in blue_group:
-        return 'Blue Group'
-    else:
-        return 'Invalid color description'
+    Parameters:
+    - color_description (str): The farmer's description of the chicken's color.
+
+    Returns:
+    - str: The color group of the chicken ('Red Group', 'Green Group', 'Blue Group') or 'Invalid color description' if the color description does not match any group.
+    """
+    pass

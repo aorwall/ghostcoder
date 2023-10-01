@@ -1,0 +1,13 @@
+from typing import Dict, List
+from .abstract_battleship import AbstractBattleship, Game, ShipPlacement, Turn
+
+class Battleship(AbstractBattleship):
+    def __init__(self):
+        self.games: Dict[str, Game] = {}
+
+    def create_game(self, game_id: str, players: List[str]) -> None:
+        if game_id in self.games:
+            raise ValueError(f"Game with id {game_id} already exists.")
+
+        board = [["" for _ in range(10)] for _ in range(10)]
+        self.games[game_id] = Game(game_id=game_id, players=players, board=board, ships=[], turns=[])

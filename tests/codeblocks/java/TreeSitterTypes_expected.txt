@@ -1,0 +1,236 @@
+ 0 module `package codeblocks;`
+  1 import `import java.lang.annotation.Retention;`
+  1 import `import java.lang.annotation.RetentionPolicy;`
+  1 import `import java.util.List;`
+  1 import `import java.util.function.Consumer;`
+  1 class `public class TreeSitterTypes implements ExampleInterface`
+   2 block_delimiter `{`
+   2 comment `// This is a single line comment.`
+   2 code `private int value;`
+   2 code `public static String CONSTANT = "foo"`
+   2 function `public TreeSitterTypes(int value)`
+    3 block_delimiter `{`
+    3 code `this.value`
+     4 code `=`
+     4 code `value`
+     4 code `;`
+    3 block_delimiter `}`
+   2 function `void literalsAndExpressions()`
+    3 block_delimiter `{`
+    3 code `int a`
+     4 code `=`
+     4 code `4`
+     4 code `,`
+     4 code `b`
+      5 code `=`
+      5 code `3`
+     4 code `;`
+    3 code `String b`
+     4 code `=`
+     4 code `"4"`
+     4 code `;`
+    3 code `double decimal`
+     4 code `=`
+     4 code `5.5`
+     4 code `;`
+    3 code `int intValue`
+     4 code `=`
+     4 code `(int) decimal`
+     4 code `;`
+    3 comment `// cast expression`
+    3 code `boolean bresult`
+     4 code `=`
+     4 code `(5 > 3) && (3 < 4)`
+     4 code `;`
+    3 comment `// binary expression`
+    3 code `int hex`
+     4 code `=`
+     4 code `0x1A`
+     4 code `;`
+    3 code `boolean isTrue`
+     4 code `=`
+     4 code `true`
+     4 code `;`
+    3 code `char charLit`
+     4 code `=`
+     4 code `'A'`
+     4 code `;`
+    3 code `String strLit`
+     4 code `=`
+     4 code `"Hello"`
+     4 code `;`
+    3 code `String multiLine`
+     4 code `=`
+     4 code `"""\n                           Hello\n                           World\n                           """`
+     4 code `;`
+    3 code `int result`
+     4 code `=`
+     4 code `intValue < hex ? intValue : hex`
+     4 code `;`
+    3 code `String interpolated`
+     4 code `=`
+     4 code `String.format("Value: %d", decimal)`
+     4 code `;`
+    3 code `String[] array`
+     4 code `=`
+     4 code `new String[]{"A", "B"}`
+     4 code `;`
+    3 code `String letterA`
+     4 code `=`
+     4 code `array[0]`
+     4 code `;`
+    3 statement `switch (intValue)`
+     4 block_delimiter `{`
+     4 code `case 10`
+      5 code `->`
+      5 code `System.out.println("Ten");`
+     4 code `default`
+      5 code `->`
+      5 code `throw new IllegalStateException("Unexpected value: " + decimal);`
+     4 block_delimiter `}`
+    3 block_delimiter `}`
+   2 class `interface ExampleInterface`
+    3 block_delimiter `{`
+    3 function `void exampleMethod();`
+    3 block_delimiter `}`
+   2 comment `/**\n     * This is a javadoc comment.\n     * @param args command-line arguments.\n     */`
+   2 function `@Override\n    public void exampleMethod()`
+    3 block_delimiter `{`
+    3 code `System.out.println("Implementation");`
+    3 block_delimiter `}`
+   2 function `public void lambda()`
+    3 block_delimiter `{`
+    3 code `Consumer<String> lambda`
+     4 code `=`
+     4 code `s -> System.out.println(s)`
+     4 code `;`
+    3 comment `// lambda expression`
+    3 code `lambda.accept("Hello Lambda!");`
+    3 code `Consumer<String> methodRef`
+     4 code `=`
+     4 code `System.out::println`
+     4 code `;`
+    3 comment `// method reference`
+    3 code `methodRef.accept("Hello Method Reference!");`
+    3 block_delimiter `}`
+   2 function `void statementsAndControls()`
+    3 block_delimiter `{`
+    3 code `int value`
+     4 code `=`
+     4 code `5`
+     4 code `;`
+    3 statement `if (value == 5)`
+     4 block_delimiter `{`
+     4 code `System.out.println("Five");`
+     4 block_delimiter `}`
+     4 code `else`
+     4 statement `if (value == 6)`
+      5 block_delimiter `{`
+      5 code `System.out.println("Six");`
+      5 block_delimiter `}`
+      5 code `else`
+      5 block_delimiter `{`
+      5 code `System.out.println("Other");`
+      5 block_delimiter `}`
+    3 statement `try (AutoCloseable ac = () ->`
+     4 block_delimiter `{`
+     4 block_delimiter `}`
+     4 code `)`
+     4 block_delimiter `{`
+     4 code `System.out.println("In try");`
+     4 block_delimiter `}`
+     4 code `catch (Exception e)`
+      5 block_delimiter `{`
+      5 code `e.printStackTrace();`
+      5 block_delimiter `}`
+     4 code `finally`
+      5 block_delimiter `{`
+      5 code `System.out.println("In finally");`
+      5 block_delimiter `}`
+    3 block_delimiter `}`
+   2 function `void methodWithParameters(String a, int... b)`
+    3 block_delimiter `{`
+    3 code `System.out.println(a);`
+    3 statement `for (int val : b)`
+     4 block_delimiter `{`
+     4 code `System.out.println(val);`
+     4 block_delimiter `}`
+    3 block_delimiter `}`
+   2 class `enum Day`
+    3 block_delimiter `{`
+    3 code `MONDAY`
+    3 code `,`
+    3 code `TUESDAY`
+    3 code `,`
+    3 code `WEDNESDAY`
+    3 code `;`
+    3 block_delimiter `}`
+   2 class `record Person(String name, int age)`
+    3 block_delimiter `{`
+    3 block_delimiter `}`
+   2 function `public static void main(String[] args)`
+    3 block_delimiter `{`
+    3 code `new TreeSitterTypes(0).literalsAndExpressions();`
+    3 block_delimiter `}`
+   2 function `public static void printList(List<?> list)`
+    3 block_delimiter `{`
+    3 comment `// wildcard`
+    3 statement `for (Object item : list)`
+     4 block_delimiter `{`
+     4 code `System.out.println(item);`
+     4 block_delimiter `}`
+    3 block_delimiter `}`
+   2 class `public static class PatternsAndSynchronization`
+    3 block_delimiter `{`
+    3 class `sealed interface Shape permits Circle, Square`
+     4 block_delimiter `{`
+     4 block_delimiter `}`
+    3 class `record Circle(double radius) implements Shape`
+     4 block_delimiter `{`
+     4 block_delimiter `}`
+    3 class `record Square(double side) implements Shape`
+     4 block_delimiter `{`
+     4 block_delimiter `}`
+    3 code `private final Object lock = new Object();`
+    3 function `public void synchronizedMethod()`
+     4 block_delimiter `{`
+     4 statement `synchronized(lock)`
+      5 block_delimiter `{`
+      5 code `System.out.println("Inside synchronized block");`
+      5 block_delimiter `}`
+     4 block_delimiter `}`
+    3 function `public static void main(String[] args)`
+     4 block_delimiter `{`
+     4 code `PatternsAndSynchronization obj`
+      5 code `=`
+      5 code `new PatternsAndSynchronization()`
+      5 code `;`
+     4 code `obj.synchronizedMethod();`
+     4 code `Shape shape`
+      5 code `=`
+      5 code `new Circle(5.0)`
+      5 code `;`
+     4 statement `if (shape instanceof Circle c)\n                System.out.println("Circle with radius: " + c.radius());`
+     4 block_delimiter `}`
+    3 block_delimiter `}`
+   2 class `public class ExampleTypesAnnotations`
+    3 block_delimiter `{`
+    3 class `@Retention(RetentionPolicy.RUNTIME)\n        @interface MyAnnotation`
+     4 block_delimiter `{`
+     4 code `String value() default "Default Value";`
+     4 block_delimiter `}`
+    3 class `@MyAnnotation(value = "Custom Value")\n        class AnnotatedClass`
+     4 block_delimiter `{`
+     4 code `private float floatValue;`
+     4 block_delimiter `}`
+    3 function `public static void main(String[] args)`
+     4 block_delimiter `{`
+     4 code `MyAnnotation annotation`
+      5 code `=`
+      5 code `AnnotatedClass.class.getAnnotation(MyAnnotation.class)`
+      5 code `;`
+     4 code `System.out.println(annotation.value());`
+     4 block_delimiter `}`
+    3 block_delimiter `}`
+   2 block_delimiter `}`
+  1 space ``

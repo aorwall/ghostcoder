@@ -1,0 +1,162 @@
+ 0 module ``
+  1 comment `// Importing modules`
+  1 import `import { myFunction as func } from './myModule';`
+  1 import `import myDefault, { myFunction } from './myModule';`
+  1 import `import * as myModule from './myModule';`
+  1 import `import myModule = require('myModule');`
+  1 comment `// Exporting modules`
+  1 code `export { myFunction };`
+  1 code `export * from './myModule';`
+  1 comment `// Enum declaration and assignment`
+  1 class `enum MyEnum`
+   2 block_delimiter `{`
+   2 code `Value1 = 1`
+   2 code `,`
+   2 code `Value2 = 2`
+   2 block_delimiter `}`
+  1 comment `// Interface declaration and extension`
+  1 class `interface IMyBaseInterface`
+   2 block_delimiter `{`
+   2 block_delimiter `}`
+  1 class `interface IMyDerivedInterface extends IMyBaseInterface`
+   2 block_delimiter `{`
+   2 block_delimiter `}`
+  1 comment `// Class declaration, extension, and implementation`
+  1 class `abstract class MyBaseClass`
+   2 block_delimiter `{`
+   2 function `abstract myAbstractMethod(input: string): void`
+   2 block_delimiter `;`
+   2 block_delimiter `}`
+  1 class `class MyDerivedClass extends MyBaseClass implements IMyInterface`
+   2 block_delimiter `{`
+   2 code `public myField: string`
+   2 block_delimiter `;`
+   2 function `override myAbstractMethod(input: string): void`
+    3 block_delimiter `{`
+    3 block_delimiter `}`
+   2 function `myMethod(arg: string): number`
+    3 block_delimiter `{`
+    3 statement `return`
+     4 code `0`
+     4 block_delimiter `;`
+    3 block_delimiter `}`
+   2 block_delimiter `}`
+  1 comment `// Function declaration and usage`
+  1 function `function myFunction(param1: string, param2: number)`
+   2 block_delimiter `{`
+   2 block_delimiter `}`
+  1 code `let myVariable: typeof myFunction`
+   2 block_delimiter `;`
+  1 comment `// Variable declaration and usage`
+  1 code `let x`
+   2 code `=`
+   2 code `10`
+   2 block_delimiter `;`
+  1 code `x += 5;`
+  1 code `let y`
+   2 code `=`
+   2 code `x`
+   2 block_delimiter `;`
+  1 code `let z`
+   2 code `=`
+   2 code `'Hello'`
+   2 block_delimiter `;`
+  1 code `let a`
+   2 code `=`
+   2 code `1 + 2`
+   2 block_delimiter `;`
+  1 code `let myNullableVar: number | null`
+   2 code `=`
+   2 code `null`
+   2 block_delimiter `;`
+  1 code `let myVar`
+   2 code `=`
+   2 code `myNullableVar!`
+   2 block_delimiter `;`
+  1 code `let myVariable: number`
+   2 code `=`
+   2 code `10`
+   2 block_delimiter `;`
+  1 comment `// Type declaration and usage`
+  1 code `type MyType`
+   2 code `=`
+   2 code `string | number`
+   2 block_delimiter `;`
+  1 code `let myVariable: MyType`
+   2 block_delimiter `;`
+  1 comment `// Try-catch block`
+  1 statement `try`
+   2 block_delimiter `{`
+   2 comment `// some code`
+   2 block_delimiter `}`
+   2 code `catch (error)`
+    3 block_delimiter `{`
+    3 code `console.error`
+     4 code `(error)`
+     4 block_delimiter `;`
+    3 block_delimiter `}`
+  1 comment `// Console log`
+  1 code `console.log`
+   2 code `("Hello, World!")`
+   2 block_delimiter `;`
+  1 comment `// New expression`
+  1 code `let date`
+   2 code `=`
+   2 code `new Date()`
+   2 block_delimiter `;`
+  1 comment `// Other expressions`
+  1 code `let x`
+   2 code `=`
+   2 code `(1 + 2) * 3`
+   2 block_delimiter `;`
+  1 code `let myInstance`
+   2 code `=`
+   2 code `new MyClass()`
+   2 block_delimiter `;`
+  1 code `let myVariable`
+   2 code `=`
+   2 code `<number>someValue`
+   2 block_delimiter `;`
+  1 code `let myVariable`
+   2 code `=`
+   2 code `someValue as number`
+   2 block_delimiter `;`
+  1 code `let myVariable: number | undefined`
+   2 block_delimiter `;`
+  1 function `function myFunction(...restParams: number[])`
+   2 block_delimiter `{`
+   2 block_delimiter `}`
+  1 code `let myVariable: Array<number>`
+   2 block_delimiter `;`
+  1 function `function isString(test: any): test is string`
+   2 block_delimiter `{`
+   2 statement `return`
+    3 code `typeof test === "string"`
+    3 block_delimiter `;`
+   2 block_delimiter `}`
+  1 code `let myVariable: typeof someOtherVariable`
+   2 block_delimiter `;`
+  1 code `type MyLookupType`
+   2 code `=`
+   2 code `MyClass['myProperty']`
+   2 block_delimiter `;`
+  1 code `type MyLiteralType`
+   2 code `=`
+   2 code `'literal'`
+   2 block_delimiter `;`
+  1 code `let myVariable: number`
+   2 block_delimiter `;`
+  1 code `let myVariable: string`
+   2 block_delimiter `;`
+  1 code `let myVariable: { property: string }`
+   2 block_delimiter `;`
+  1 code `let myVariable: number[]`
+   2 block_delimiter `;`
+  1 code `let myVariable: [number, string]`
+   2 block_delimiter `;`
+  1 code `let myVariable: readonly number[]`
+   2 block_delimiter `;`
+  1 code `let myVariable: number | string`
+   2 block_delimiter `;`
+  1 code `let myVariable: (param: string) => number`
+   2 block_delimiter `;`

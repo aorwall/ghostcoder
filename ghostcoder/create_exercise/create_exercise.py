@@ -1,27 +1,33 @@
 import json
 import logging
 import random
+import re
+import shutil
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from IPython.core.display import Pretty
 from IPython.display import display, Markdown
 from langchain.chat_models import ChatOpenAI
 from tqdm.notebook import tqdm
 
+from ghostcoder import FileRepository
+from ghostcoder.actions import CodeWriter
+from ghostcoder.actions.write_code.base import StreamCallback
 from ghostcoder.benchmark.benchmark import Benchmark, BenchmarkResult
 from ghostcoder.callback import LogCallbackHandler
-from ghostcoder.llm import ChatLLMWrapper, LLMWrapper
-from ghostcoder.schema import Difficulty
 from ghostcoder.create_exercise.prompts import BUSINESS_AREAS, SKILLS, INSTRUCTION_SYSTEM_PROMPT, \
     CREATE_BUSINESS_INSTRUCTION_PROMPT, REVIEW_INSTRUCTION_SYSTEM_PROMPT, \
     WRITE_TEST_AND_SOLUTION_SYSTEM_PROMPT, \
     VERIFY_AFTER_TEST_SYSTEM_PROMPT, VERIFY_TEST_SYSTEM_PROMPT, \
-    VERIFY_TEST_SUIT_FEW_SHOTS, CREATE_STUBS_SYSTEM_PROMPT, CREATE_STUBS_FEW_SHOTS
-from ghostcoder import FileRepository
-from ghostcoder.actions import WriteCodeAction
+    CREATE_STUBS_SYSTEM_PROMPT, CREATE_STUBS_PYTHON_RULES, \
+    CREATE_STUBS_JAVA_RULES, DIRECTORY_NAME_PROMPT
+from ghostcoder.ghostcoder import Ghostcoder
+from ghostcoder.ipython_callback import DisplayCallback
+from ghostcoder.llm import ChatLLMWrapper, LLMWrapper
+from ghostcoder.schema import Difficulty
 from ghostcoder.schema import Message, TextItem, FileItem, Item
-from ghostcoder.verify.verify_python_unittest import PythonUnittestVerifier
+from ghostcoder.test_tools import JavaMvnUnit5TestTool, PythonUnittestTestTool
 
 logger = logging.getLogger("ghostcoder.create_exercise")
 
@@ -45,13 +51,6 @@ def create_business_request(skill: str = None, difficulty: Difficulty = None, bu
 
     return request
 
-def display_response(response_message: Message):
-    for item in response_message.items:
-        if "file" in item.type and not item.language:
-            content = f"**{item.file_path}**\n{item.content}\n"
-            display(Markdown(content))
-        else:
-            display(Markdown(item.to_prompt()))
 
 class ExerciseBuilder:
 
@@ -68,43 +67,68 @@ class ExerciseBuilder:
             self.prompt_log_dir = exercises_dir / ".prompt_log"
 
         self.benchmark_results_dir = benchmark_results_dir
-        self.repository = FileRepository(repo_path=str(exercises_dir), use_git=False)
         self.exercise = exercise
         self.basic_llm_name = basic_llm_name
         self.smart_llm_name = smart_llm_name
+        self.display = DisplayCallback()
 
     @property
     def exercise_dir(self):
         return self.exercises_dir / self.exercise
+
+    @property
+    def repository(self):
+        if self.exercise:
+            return FileRepository(repo_path=self.exercise_dir, use_git=False) # TODO: use_git=True
+        raise ValueError("No exercise created yet")
 
     def create_instruction(self, request: str, instruction_format: str = "tech-details"):
         if self.exercise:
             raise Exception(f"An instruction already created for the exercise {self.exercise}")
 
         llm = self.create_openai_client(llm_name=self.smart_llm_name, temperature=1.0)
-        action = self.create_coder_writer(llm=llm, sys_prompt=INSTRUCTION_SYSTEM_PROMPT, expect_one_file=True, allow_hallucinated_files=True)
 
-        display(Pretty(f"Creating new instruction using {self.smart_llm_name} with temperature set to 1.0..."))
-
-        message = Message(sender="Human", items=[
+        request_msg = Message(sender="Human", items=[
             TextItem(text=request)
         ])
+        messages = [request_msg]
 
-        response_messages = action.execute(message=message, message_history=[])
-        response_message = response_messages[-1]
+        self.display.display_message(request_msg)
 
-        exercise = None
-        for item in response_message.find_items_by_type("updated_file"):
-            # TODO: Handle files saved in the wrong way
-            if item.file_path.endswith("/instructions.md"):
-                path_parts = item.file_path.split('/')
-                if len(path_parts) > 1:
-                    exercise = path_parts[-2].lower()
+        # TODO: Use Ghostcoder instead if History is implemented
+        instructions, _ = llm.generate(sys_prompt=INSTRUCTION_SYSTEM_PROMPT, messages=messages, callback = StreamCallback(callback=self.display))
 
-        if not exercise:
-            raise Exception("Couldn't create instruction")
+        instruction_msg = Message(sender="AI", items=[
+            TextItem(text=instructions)
+        ])
+        messages.append(instruction_msg)
+
+        self.display.display_message(instruction_msg)
+        # TODO: Verify contents
+
+        exercise_name_msg = Message(sender="Ghostcoder", items=[
+            TextItem(text=DIRECTORY_NAME_PROMPT)
+        ])
+        messages.append(exercise_name_msg)
+        self.display.display_message(exercise_name_msg)
+
+        exercise, _ = llm.generate(
+            sys_prompt=INSTRUCTION_SYSTEM_PROMPT,
+            messages=messages,
+            callback=StreamCallback(callback=self.display))
+
+        self.display.display_message(Message(sender="AI", items=[
+            TextItem(text=exercise)
+        ]))
+
+        pattern = re.compile(r"^[a-z0-9_]+$")
+        if len(exercise) > 24 or not pattern.match(exercise):
+            raise Exception(f"Invalid exercise name {exercise}")
 
         self.exercise = exercise
+        self.exercise_dir.mkdir(parents=True, exist_ok=True)
+        instruction_file = self.exercise_dir / "instructions.md"
+        instruction_file.write_text(instructions)
 
         info_file = self.exercise_dir / "info.json"
         with open(info_file, "w") as json_file:
@@ -116,12 +140,7 @@ class ExerciseBuilder:
 
         logger.info(f"Created instruction for exercise {self.exercise}")
 
-        for item in response_message.items:
-            if "file" in item.type and not item.language:
-                content = f"**{item.file_path}**\n{item.content}\n"
-                display(Markdown(content))
-            if item.type == "text":
-                display(Markdown(item.to_prompt()))
+        self.display.display("Ghostcoder", f"I saved the new exercise instructions to `{instruction_file}`.")
 
     def assert_exercise(self):
         if not self.exercise:
@@ -132,9 +151,12 @@ class ExerciseBuilder:
             raise Exception(f"{self.exercise_dir / 'instructions.md'} not found.")
 
         llm = self.create_openai_client(llm_name=self.smart_llm_name, temperature=0.0)
-        action = self.create_coder_writer(llm=llm, sys_prompt=REVIEW_INSTRUCTION_SYSTEM_PROMPT, expect_one_file=True)
+        ghostcoder = Ghostcoder(llm=llm,
+                                code_writer_sys_prompt=REVIEW_INSTRUCTION_SYSTEM_PROMPT,
+                                callback=self.display,
+                                repository=self.repository)
 
-        instruction_file = f"{self.exercise}/instructions.md"
+        instruction_file = "instructions.md"
 
         logger.info(f"Review the instructions in {instruction_file}...")
 
@@ -142,12 +164,11 @@ class ExerciseBuilder:
             FileItem(file_path=instruction_file)
         ])
 
-        response_messages = action.execute(message=message)
+        response_messages = ghostcoder.run(message=message)
         response_message = response_messages[-1]
 
         # TODO: Verify response
 
-        display_response(response_message)
 
     def create_tests_and_implementation(self, language: str = "python", retry: int = 0):
         self.assert_exercise()
@@ -155,79 +176,61 @@ class ExerciseBuilder:
 
         llm = self.create_openai_client(llm_name=self.smart_llm_name, temperature=0.0)
 
-        verifier = None
+        language_dir = self.exercises_dir / self.exercise / language
+        language_dir.mkdir(parents=True, exist_ok=True)
+
         if language == "python":
-            test_file = f"{self.exercise}/{language}/{self.exercise}_test.py"
-            impl_file = f"{self.exercise}/{language}/{self.exercise}.py"
-            verifier = PythonUnittestVerifier(test_file_pattern="*_test.py",
-                                              current_dir=Path(self.exercises_dir / self.exercise / language))
+            test_file = f"/{language}/{self.exercise}_test.py"
+            impl_file = f"/{language}/{self.exercise}.py"
             language_specifics = "* Use unittest for tests"
+            test_tool = PythonUnittestTestTool(current_dir=language_dir, callback=self.display)
         elif language == "java":
+            pom_xml = self.get_resource("no_deps/pom.xml")
+            self.repository.update_file(f"{language}/pom.xml", pom_xml)
             words = self.exercise.split('_')
             class_name = ''.join(word.capitalize() for word in words)
-            test_file = f"{self.exercise}/{language}/{class_name}Test.java"
-            impl_file = f"{self.exercise}/{language}/{class_name}.java"
+            test_file = f"/{language}/src/test/java/{class_name}Test.java"
+            impl_file = f"/{language}/src/main/java/{class_name}.java"
             language_specifics = "* Use JUnit5 for tests"
+            test_tool = JavaMvnUnit5TestTool(current_dir=language_dir, callback=self.display)
         else:
             raise Exception(f"Unsupported language {language}")
 
-        action = WriteCodeAction(llm=llm,
-                                 sys_prompt=WRITE_TEST_AND_SOLUTION_SYSTEM_PROMPT.format(
-                                     language=language, language_specifics=language_specifics),
-                                 repository=self.repository,
-                                 auto_mode=True, verifier=verifier)
-
-        if not retry:
-            display(Pretty(f"Create test suite and implementation for exercise {self.exercise} in {language}."))
+        ghostcoder = Ghostcoder(llm=llm,
+                                code_writer_sys_prompt=WRITE_TEST_AND_SOLUTION_SYSTEM_PROMPT.format(
+                                     language=language,
+                                     language_specifics=language_specifics),
+                                verify_code=True,
+                                test_tool=test_tool,
+                                callback=self.display,
+                                repository=self.repository)
 
         logger.info(
             f"Create test suite and implementation for exercise {self.exercise} in {language}")
 
-        instruction_file = f"{self.exercise}/instructions.md"
-
         message = Message(sender="Human", items=[
-            FileItem(file_path=instruction_file),
-            FileItem(file_path=test_file),
-            FileItem(file_path=impl_file),
+            FileItem(file_path="instructions.md"),
+            FileItem(file_path=test_file, new=True),
+            FileItem(file_path=impl_file, new=True),
         ])
 
-        response_messages = action.execute(message=message)
-        if response_messages[-1].sender == "Human":
-            display(
-                Markdown(
-                    f"Couldn't create a test suite and implementation based on instructions in `{instruction_file}` "
-                    f"that passed the tests. Call this function again to try again or create a new instruction._"))
+        response_messages = ghostcoder.run(message=message)
+        if response_messages[-1].find_items_by_type("verification_failure"):
+            self.display.display("Ghostcoder", "Validation failed when trying to create a test suite"
+                                               " and implementation based on instructions in `instructions.md` ")
+        else:
+            found_files = set()
+            target_files = {test_file, impl_file}
 
-            display_response(response_messages[-1])
-            return
+            for response_message in response_messages:
+                for item in response_message.find_items_by_type("updated_file"):
+                    if item.file_path in target_files:
+                        found_files.add(item.file_path)
 
-        found_files = set()
-        target_files = {test_file, impl_file}
-
-        for response_message in response_messages:
-            for item in response_message.find_items_by_type("updated_file"):
-                if item.file_path in target_files:
-                    found_files.add(item.file_path)
-
-                if target_files.issubset(found_files):
-                    logger.info(f"{found_files} where successfully created..")
-                    display(
-                        Pretty(f"Test suite and implementation based on instructions in `{instruction_file}` successfully created."))
-                    display_response(response_message)
-                    return
-
-        if retry < 0:
-            logger.warning(
-                f"The files {found_files} was returned, expected {target_files}, "
-                f"will try again. The response was:\n{response_messages[-1].to_prompt()}")
-            display(
-                Pretty(
-                    f"The files {found_files} was returned, expected {target_files}, will try again..."),
-                display_id="create_tests_and_implementation")
-
-            return self.create_tests_and_implementation(retry=retry + 1)
-
-        raise Exception("Couldn't create instruction")
+            if target_files.issubset(found_files):
+                logger.info(f"{found_files} where successfully created..")
+            else:
+                self.display.display("Failed to create test suite and implementation based on instructions in `instructions.md`.")
 
     def review_test_suite(self, language: str = "python"):
         self.assert_exercise()
@@ -235,75 +238,85 @@ class ExerciseBuilder:
 
         llm = self.create_openai_client(llm_name=self.smart_llm_name, temperature=0.0)
 
-        action = WriteCodeAction(llm=llm, sys_prompt=VERIFY_TEST_SYSTEM_PROMPT, repository=self.repository,
-                                 auto_mode=True, verifier=PythonUnittestVerifier(test_file_pattern="*_test.py",
-                                                                                 current_dir=Path(
-                                                                                     self.exercises_dir / self.exercise / language)))
+        language_dir = self.exercises_dir / self.exercise / language
 
-        logger.info(f"review_test_suite({self.exercise}): Review test suite")
+        language_specifics = ""
+        if language == "python":
+            language_specifics = CREATE_STUBS_PYTHON_RULES
+            test_tool = PythonUnittestTestTool(current_dir=language_dir, callback=self.display)
+        elif language == "java":
+            language_specifics = CREATE_STUBS_JAVA_RULES
+            test_tool = JavaMvnUnit5TestTool(current_dir=language_dir, callback=self.display)
 
-        instruction_file = f"{self.exercise}/instructions.md"
+        ghostcoder = Ghostcoder(llm=llm,
+                                code_writer_sys_prompt=VERIFY_TEST_SYSTEM_PROMPT.format(language_specifics),
+                                callback=self.display,
+                                verify_code=True,
+                                test_tool=test_tool,
+                                repository=self.repository)
 
-        files = [FileItem(file_path=f"{language}/{f.name}", content=f.read_text())
-                 for f in (self.exercise_dir / language).iterdir() if f.is_file()]
+        logger.debug(f"Review test suite")
 
-        message = Message(sender="Human", items=[FileItem(file_path=instruction_file)] + files)
+        file_items = self.repository.get_source_files(
+            language=language,
+            directory=f"{language}",
+            include_test_files=True)
 
-        response_messages = action.execute(message=message, message_history=VERIFY_TEST_SUIT_FEW_SHOTS)
-        response_message = response_messages[-1]
-        if response_message.sender == "Human":
+        message = Message(sender="Human",
+                          items=[FileItem(file_path="instructions.md")] + file_items)
+
+        response_messages = ghostcoder.run(message=message)
+        if response_messages[-1].find_items_by_type("verification_failure"):
             display(
                 Markdown(f"_The updated tests didn't pass the tests. "
                          f"Call this function again to try again or create a new instruction._"),
                 display_id="review_test_suite")
 
-            display_response(response_message)
-            return
-
-        display_response(response_message)
-
     def create_stubs(self, language: str = "python"):
         self.assert_exercise()
         # TODO: Check for test and implementation files
 
+        def ignore_example(dir, filenames):
+            return ['.example']
+
+        language_dir = self.exercise_dir / language
+        example_dir = language_dir / ".example"
+        example_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(language_dir, example_dir, dirs_exist_ok=True, ignore=ignore_example)
+
         llm = self.create_openai_client(llm_name="gpt-4", temperature=0.0)
-        action = self.create_coder_writer(llm=llm, sys_prompt=CREATE_STUBS_SYSTEM_PROMPT, expect_one_file=True)
 
-        display(Pretty(f"Create stub files for {self.exercise} in {language}"))
+        language_specifics = ""
+        if language == "python":
+            language_specifics = CREATE_STUBS_PYTHON_RULES
+        elif language == "java":
+            language_specifics = CREATE_STUBS_JAVA_RULES
 
-        instruction_file = f"{self.exercise}/instructions.md"
+        ghostcoder = Ghostcoder(llm=llm,
+                                code_writer_sys_prompt=CREATE_STUBS_SYSTEM_PROMPT.format(
+                                    language_specifics=language_specifics),
+                                callback=self.display,
+                                repository=self.repository,
+                                max_retries=0)
 
-        target_files = set()
-        files = []
-        for file in (self.exercise_dir / language).iterdir():
-            if file.is_file():
-                files.append(FileItem(file_path=f"{self.exercise}/{language}/{file.name}", content=file.read_text(), readonly=True))
-                if "test" not in file.name.lower():
-                    stub_file = f"{self.exercise}/{language}/stubs/{file.name}"
-                    stub_with_comments = f"{self.exercise}/{language}/stubs_with_comments/{file.name}"
-                    files.append(FileItem(file_path=stub_file, content=file.read_text()))
-                    files.append(FileItem(file_path=stub_with_comments, content=file.read_text()))
-                    target_files.add(stub_file)
-                    target_files.add(stub_with_comments)
+        instruction_file = f"instructions.md"
 
-        message = Message(sender="Human", items=[FileItem(file_path=instruction_file)] + files)
-        response_messages = action.execute(message=message, message_history=CREATE_STUBS_FEW_SHOTS)
+
+
+        file_items = self.repository.get_source_files(
+            language=language,
+            directory=f"{language}")
+
+        filepaths = "`, `".join([file_item.file_path for file_item in file_items])
+        items = [TextItem(text=f"Replace the code in `{filepaths}`"),
+                 FileItem(file_path=instruction_file, readonly=True)]
+        items.extend(file_items)
+
+        message = Message(sender="Human", items=items)
+        response_messages = ghostcoder.run(message=message) # TODO CREATE_STUBS_FEW_SHOTS +
         response_message = response_messages[-1]
 
-        found_files = set()
-        for item in response_message.find_items_by_type("updated_file"):
-            if item.file_path in target_files:
-                found_files.add(item.file_path)
-
-            if target_files.issubset(found_files):
-                logger.info(f"create_stubs(): {found_files} where successfully created..")
-                display_response(response_message)
-                return
-
-        raise Exception(f"The files {found_files} was returned, expected {target_files}, "
-                        f"will try again. The response was:\n{response_messages[-1].to_prompt()}")
-
-    def run_and_verify_exercise(self):
+    def run_and_verify_exercise(self, language: str = "python"):
         self.assert_exercise()
         # TODO: Check for test, implementation and stub files
 
@@ -326,6 +339,7 @@ class ExerciseBuilder:
                 llm=llm,
                 llm_name=self.basic_llm_name,
                 llm_params={"temperature": temperature},
+                language=language,
                 exercises_dir=self.exercises_dir,
                 benchmarks_dir=benchmark_result_dir,
                 reviewer_llm=reviewer_llm
@@ -359,6 +373,7 @@ class ExerciseBuilder:
                     llm=llm,
                     llm_name=self.smart_llm_name,
                     llm_params={"temperature": temperature},
+                    language=language,
                     exercises_dir=self.exercises_dir,
                     benchmarks_dir=benchmark_result_dir,
                     reviewer_llm=reviewer_llm
@@ -408,13 +423,13 @@ class ExerciseBuilder:
 
         logger.info(f"Review {self.exercise} with {len(review_items)} review items")
 
-        instruction_file = f"{self.exercise}/instructions.md"
+        instruction_file = f"instructions.md"
 
         # FIXME: not only python
-        test_file = f"{self.exercise}/{language}/{self.exercise}_test.py"
-        impl_file = f"{self.exercise}/{language}/{self.exercise}.py"
-        stub_file = f"{self.exercise}/{language}/stubs/{self.exercise}.py"
-        stub_with_comments = f"{self.exercise}/{language}/stub_with_comments/{self.exercise}.py"
+        test_file = f"{language}/{self.exercise}_test.py"
+        impl_file = f"{language}/{self.exercise}.py"
+        stub_file = f"{language}/stubs/{self.exercise}.py"
+        stub_with_comments = f"{language}/stub_with_comments/{self.exercise}.py"
 
         message = Message(sender="Human", items=[
             FileItem(file_path=instruction_file),
@@ -432,7 +447,6 @@ class ExerciseBuilder:
         if len(updated_files):
             logger.info(f"Did corrections to {len(updated_files)}")
             return True
-
 
     def review_benchmark_results(self, results: List[BenchmarkResult], language: str = "python") -> bool:
         success_count_basic = len(
@@ -488,22 +502,29 @@ class ExerciseBuilder:
 
         return False
 
-    def create_openai_client(self, llm_name: str, temperature: float):
+    def create_openai_client(self, llm_name: str, temperature: float, streaming: bool = True):
         callback = LogCallbackHandler(str(self.prompt_log_dir))
         return ChatLLMWrapper(ChatOpenAI(
             model=llm_name,
             temperature=temperature,
+            streaming=streaming,
             callbacks=[callback]
         ))
+
+    def get_resource(self, resource_name: str):
+        script_dir = Path(__file__).parent
+        resource_path = script_dir / "resources" / resource_name
+        return resource_path.read_text()
 
     def create_coder_writer(self,
                             llm: LLMWrapper,
                             sys_prompt: str = None,
                             expect_one_file: bool = False,
                             allow_hallucinated_files: bool = False):
-        return WriteCodeAction(llm=llm,
-                               sys_prompt=sys_prompt,
-                               repository=self.repository,
-                               auto_mode=True,
-                               expect_one_file=expect_one_file,
-                               allow_hallucinated_files=allow_hallucinated_files)
+        return CodeWriter(llm=llm,
+                          sys_prompt=sys_prompt,
+                          repository=self.repository,
+                          callback=self.display,
+                          auto_mode=True,
+                          expect_one_file=expect_one_file,
+                          allow_hallucinated_files=allow_hallucinated_files)

@@ -1,0 +1,153 @@
+ 0 module ``
+  1 comment `// 1. Variable Declarations`
+  1 code `let number`
+   2 code `=`
+   2 code `10`
+   2 block_delimiter `;`
+  1 code `const PI`
+   2 code `=`
+   2 code `3.14`
+   2 block_delimiter `;`
+  1 code `var oldSchoolVariable`
+   2 code `=`
+   2 code `'This is old style'`
+   2 block_delimiter `;`
+  1 comment `// 2. Function Declaration`
+  1 function `function greet(name)`
+   2 block_delimiter `{`
+   2 statement `return`
+    3 code ``Hello, ${name}!``
+    3 block_delimiter `;`
+   2 block_delimiter `}`
+  1 comment `// 3. Arrow Function`
+  1 function `const square = (x) =>`
+   2 code `x * x`
+   2 block_delimiter `;`
+  1 comment `// 4. Class Declaration`
+  1 class `class Person`
+   2 block_delimiter `{`
+   2 function `constructor(name, age)`
+    3 block_delimiter `{`
+    3 code `this.name`
+     4 code `=`
+     4 code `name`
+     4 block_delimiter `;`
+    3 code `this.age`
+     4 code `=`
+     4 code `age`
+     4 block_delimiter `;`
+    3 block_delimiter `}`
+   2 function `introduce()`
+    3 block_delimiter `{`
+    3 statement `return`
+     4 code ``Hi, I'm ${this.name} and I'm ${this.age} years old.``
+     4 block_delimiter `;`
+    3 block_delimiter `}`
+   2 block_delimiter `}`
+  1 comment `// 5. Object Literal`
+  1 code `const obj`
+   2 code `=`
+   2 code `{`
+    3 code `key: 'value'`
+    3 code `,`
+    3 function `method()`
+     4 block_delimiter `{`
+     4 statement `return`
+      5 code `'This is a method'`
+      5 block_delimiter `;`
+     4 block_delimiter `}`
+    3 block_delimiter `}`
+   2 block_delimiter `;`
+  1 comment `// 6. Array Declaration`
+  1 code `const array`
+   2 code `=`
+   2 code `[1, 2, 3, 4]`
+   2 block_delimiter `;`
+  1 comment `// 7. Loops`
+  1 statement `for (let i = 0; i < array.length; i++)`
+   2 block_delimiter `{`
+   2 code `console.log`
+    3 code `(array[i])`
+    3 block_delimiter `;`
+   2 block_delimiter `}`
+  1 code `array.forEach((element) =>`
+   2 block_delimiter `{`
+   2 code `console.log`
+    3 code `(element)`
+    3 block_delimiter `;`
+   2 block_delimiter `}`
+   2 block_delimiter `)`
+   2 block_delimiter `;`
+  1 comment `// 8. Conditional`
+  1 statement `if (number > 5)`
+   2 block_delimiter `{`
+   2 code `console.log`
+    3 code `('Number is greater than 5')`
+    3 block_delimiter `;`
+   2 block_delimiter `}`
+   2 code `else`
+    3 block_delimiter `{`
+    3 code `console.log`
+     4 code `('Number is 5 or smaller')`
+     4 block_delimiter `;`
+    3 block_delimiter `}`
+  1 comment `// 9. Switch-case`
+  1 code `switch (number)`
+   2 block_delimiter `{`
+   2 code `case 10`
+    3 code `:`
+    3 code `console.log`
+     4 code `('Number is 10')`
+     4 block_delimiter `;`
+    3 code `break;`
+   2 code `default`
+    3 code `:`
+    3 code `console.log`
+     4 code `('Number is not 10')`
+     4 block_delimiter `;`
+    3 code `break;`
+   2 block_delimiter `}`
+  1 comment `// 10. Try-catch`
+  1 statement `try`
+   2 block_delimiter `{`
+   2 code `throw new Error('This is an error');`
+   2 block_delimiter `}`
+   2 code `catch (error)`
+    3 block_delimiter `{`
+    3 code `console.error`
+     4 code `('Caught an error:', error.message)`
+     4 block_delimiter `;`
+    3 block_delimiter `}`
+  1 comment `// 12. Destructuring`
+  1 code `const { key }`
+   2 code `=`
+   2 code `obj`
+   2 block_delimiter `;`
+  1 code `const [firstElement]`
+   2 code `=`
+   2 code `array`
+   2 block_delimiter `;`
+  1 comment `// 13. Spread/Rest`
+  1 code `const newObj`
+   2 code `=`
+   2 code `{`
+    3 code `...obj`
+    3 code `,`
+    3 code `newKey: 'newValue'`
+    3 block_delimiter `}`
+   2 block_delimiter `;`
+  1 code `const newArray`
+   2 code `=`
+   2 code `[...array, 5]`
+   2 block_delimiter `;`
+  1 comment `// 14. Template Literals`
+  1 code `const message`
+   2 code `=`
+   2 code ``This is a number: ${number}``
+   2 block_delimiter `;`
+  1 comment `// 15. Import/Export (common in modules)`
+  1 code `export { greet };`
+  1 import `import { greet } from './path-to-this-file';`
+  1 code `console.log`
+   2 code `('Demonstration complete.')`
+   2 block_delimiter `;`

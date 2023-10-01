@@ -48,26 +48,34 @@ class CodeItem(Item):
 
 class VerificationFailureItem(Item):
     type: str = "verification_failure"
+    test_code: str = Field(default=None, description="Code of the test")
     output: str = Field(description="Output of the verification process")
     test_method: Optional[str] = Field(default=None, description="Test method")
     test_class: Optional[str] = Field(default=None, description="Test class")
     test_file: Optional[str] = Field(default=None, description="Test file")
 
     def to_prompt(self, style: Optional[str] = None):
-        return f"Test method {self.test_class}.{self.test_method} in `{self.test_file}` failed. Output:\n```\n{self.output}\n```"
+        code = "" if not self.test_code else f"```\n{self.test_code}\n```"
+        return (f"Test method `{self.test_class}.{self.test_method}` in `{self.test_file}` failed."
+                f"\n{code} "
+                f"\nOutput:\n```\n{self.output}\n```")
 
 
 class FileItem(CodeItem):
     type: str = "file"
     file_path: str = Field(default="", description="Path to file")
     readonly: bool = Field(default=False, description="Is the file readonly")
+    new: bool = Field(default=False, description="If the file is new and doesn't exist in the repository")
 
     @root_validator(pre=True)
     def set_language(cls, values):
-        file_path = values.get('file_path')
-        language = values.get('language')
+        file_path = values.get("file_path")
+        language = values.get("language")
         if file_path and not language:
-            values['language'] = language_by_filename(file_path)
+            values["language"] = language_by_filename(file_path)
+
+        if not file_path.startswith("/"):
+            values["file_path"] = "/" + file_path
         return values
 
     def __str__(self) -> str:
@@ -108,6 +116,7 @@ class UpdatedFileItem(FileItem):
     type: str = "updated_file"
     file_path: str = Field(description="file to update or create")
     error: Optional[str] = Field(default=None, description="error message")
+    diff: Optional[str] = Field(default=None, description="diff of the file")
     invalid: str = Field(default=None, description="file is invalid")
     created: bool = Field(default=False, description="file is created")
 
@@ -136,7 +145,7 @@ class UpdatedFileItem(FileItem):
 class ItemHolder(BaseModel):
     items: List[Item] = Field(default=[])
 
-    @validator('items', pre=True)
+    @validator("items", pre=True)
     def parse_items(cls, items: List[Union[Dict[str, Any], Item]]) -> List[Item]:
         parsed_items = []
         for item in items:
@@ -144,14 +153,14 @@ class ItemHolder(BaseModel):
                 parsed_items.append(item)
                 continue
 
-            item_type = item.get('type')
-            if item_type == 'text':
+            item_type = item.get("type")
+            if item_type == "text":
                 parsed_items.append(TextItem(**item))
-            elif item_type == 'code':
+            elif item_type == "code":
                 parsed_items.append(CodeItem(**item))
-            elif item_type == 'file':
+            elif item_type == "file":
                 parsed_items.append(FileItem(**item))
-            elif item_type == 'updated_file':
+            elif item_type == "updated_file":
                 parsed_items.append(UpdatedFileItem(**item))
             else:
                 raise ValidationError(f"Unknown item type: {item_type}")
@@ -228,7 +237,7 @@ class Stats(BaseModel):
 
 
 class Message(ItemHolder):
-    sender: str = Field(description="who sent the message", enum=["Human", "AI"])
+    sender: str = Field(description="who sent the message", enum=["Human", "AI", "Agent"])
     items: List[Item] = []
     summary: Optional[str] = Field(default=None, description="summary of the message")
     stats: Optional[Stats] = Field(default=None, description="status information about the processing of the message")
@@ -279,7 +288,7 @@ class File(BaseModel):
 class Folder(BaseModel):
     name: str
     path: str
-    children: List[Union[File, 'Folder']]
+    children: List[Union[File, "Folder"]]
 
     def traverse(self) -> list[File]:
         files = []
@@ -304,10 +313,10 @@ class Folder(BaseModel):
         file_tree = ""
         for child in self.children:
             if isinstance(child, Folder):
-                file_tree += ' ' * indent + child.name + "/\n"
+                file_tree += " " * indent + child.name + "/\n"
                 file_tree += child.tree_string(indent + 2)
             else:
-                file_tree += ' ' * (indent) + child.name + "\n"
+                file_tree += " " * (indent) + child.name + "\n"
         return file_tree
 
 

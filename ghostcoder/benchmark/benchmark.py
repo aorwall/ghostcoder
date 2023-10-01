@@ -6,42 +6,40 @@ from itertools import groupby
 from pathlib import Path
 from typing import Optional, List
 
-from IPython.core.display import Markdown, Pretty
-from IPython.core.display_functions import display, update_display
 from langchain.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field
 
-from codeblocks import create_parser, CodeBlock, CodeBlockType
-from ghostcoder import FileRepository
-from ghostcoder.actions import WriteCodeAction
+from ghostcoder import FileRepository, Ghostcoder
+from ghostcoder.actions import CodeWriter
 from ghostcoder.benchmark.prompts import FEEDBACK_SYSTEM_PROMPT
 from ghostcoder.callback import LogCallbackHandler
+from ghostcoder.codeblocks import create_parser, CodeBlock, CodeBlockType
+from ghostcoder.ipython_callback import DisplayCallback
+from ghostcoder.ipython_callback_2 import DisplayCallbackOne
 from ghostcoder.llm import LLMWrapper
-from ghostcoder.schema import UpdatedFileItem, TextItem, Message, FileItem, VerificationFailureItem, VerificationResult, \
+from ghostcoder.schema import TextItem, Message, FileItem, VerificationFailureItem, VerificationResult, \
     CodeItem
-from ghostcoder.verify.verify_java_mvn_junit5 import JavaMvnUnit5Verifier
-from ghostcoder.verify.verify_python_unittest import PythonUnittestVerifier
+from ghostcoder.test_tools.verify_java_mvn_junit5 import JavaMvnUnit5TestTool
+from ghostcoder.test_tools.verify_python_unittest import PythonUnittestTestTool
+from ghostcoder.utils import get_extension
 
-logger = logging.getLogger(__name__)
-
+logger = logging.getLogger("ghostcoder.benchmark")
 
 class BenchmarkFeedback(BaseModel):
     correct: bool = Field(description="If the submitted code is correct.")
     correctness_feedback: str = Field(description="The feedback to the candidate about if it's correct.", )
-    compliant: bool = Field(
-        description="If the submitted code is compliant with the requirements and evaluation criteria.")
+    compliant: bool = Field(description="If the submitted code is compliant with the requirements and evaluation criteria.")
     compliance_feedback: str = Field(description="The feedback to the candidate about if it's compliant.")
     extra_code: bool = Field(description="If there is extra code in the submission.")
     extra_code_feedback: str = Field(description="The feedback to the candidate about if there is extra code.")
+    test_arguments: bool = Field(description="If the candidate argues that the tests are incorrect.")
     tests_correct: bool = Field(description="If your tests are correct.")
-    tests_feedback: str = Field(
-        description="The feedback to the candidate why their implementation didn't pass your tests or if the tests needs to be fixed.")
+    tests_feedback: str = Field(description="The feedback to the candidate why their implementation didn't pass your tests or if the tests needs to be fixed.")
 
 
 class BenchmarkResult(BaseModel):
     exercise: str
     success: bool
-    retries: int
     result_dir: str
     llm_name: str
     llm_params: dict
@@ -54,155 +52,115 @@ class Benchmark:
 
     def __init__(self,
                  llm: LLMWrapper,
+                 basic_llm: LLMWrapper,
                  llm_name: str,
                  exercises_dir: Path,
                  benchmarks_dir: Path,
                  language: str = "python",
+                 exercise: str = None,
                  reviewer_llm: LLMWrapper = None,
                  llm_params: dict = {},
                  max_retries: int = 2,
-                 stubs_with_comments: bool = False):
+                 stubs_with_comments: bool = False,
+                 callback: DisplayCallback = DisplayCallbackOne()):
         self.llm = llm
+        self.basic_llm = basic_llm
         self.reviewer_llm = reviewer_llm
         self.language = language
         self.llm_name = llm_name
         self.llm_params = llm_params
         self.exercises_dir = exercises_dir
-        self.benchmark_result_dir = self.create_test_dir(benchmarks_dir)
+
+        self.benchmark_result_dir = self.create_test_dir(benchmarks_dir, llm_name)
+
+        if exercise:
+            self.copy_exercise(exercise=exercise)
+        else:
+            self.copy_exercises()
+
         self.stubs_with_comments = stubs_with_comments
         self.max_retries = max_retries
         self.feedback_parser = PydanticOutputParser(pydantic_object=BenchmarkFeedback)
+        self.callback = callback
 
     def run_exercise(self, exercise: str):
-        exercise_benchmark_result_dir = self.copy_exercise(exercise=exercise)
+        exercise_benchmark_result_dir = self.benchmark_result_dir / exercise
 
-        log_dir = exercise_benchmark_result_dir / "prompt_log"
+        log_dir = exercise_benchmark_result_dir / ".prompt_log"
         self.llm.llm.callbacks = [LogCallbackHandler(str(log_dir))]
         self.reviewer_llm.llm.callbacks = [LogCallbackHandler(str(log_dir))]
 
-        test_repo = FileRepository(repo_path=str(exercise_benchmark_result_dir), use_git=False)
-        action = WriteCodeAction(llm=self.llm, repository=test_repo, auto_mode=True)
+        exercise_repo = FileRepository(repo_path=exercise_benchmark_result_dir, use_git=False)
 
-        display(Pretty(f"Running benchmark on exercise *{exercise}*"),
-                display_id=str(exercise_benchmark_result_dir))
+        ghostcoder = Ghostcoder(llm=self.llm,
+                                basic_llm=self.basic_llm,
+                                callback=self.callback,
+                                repository=exercise_repo,
+                                verify_code=True,
+                                language=self.language,
+                                max_retries=3)
 
-        benchmark_result = self._run_exercise(
+        if self.callback:
+            self.callback.display_gc(f"Running benchmark on exercise *{exercise}*")
+
+        benchmark_result, messages = self._run_exercise(
             exercise=exercise,
-            action=action,
-            exercise_benchmark_result_dir=exercise_benchmark_result_dir
-        )
+            exercise_benchmark_result_dir=exercise_benchmark_result_dir,
+            coder=ghostcoder)
 
         benchmark_result = self.review_benchmark_result(
             benchmark_result=benchmark_result,
-            exercise_benchmark_result_dir=exercise_benchmark_result_dir)
+            exercise_benchmark_result_dir=exercise_benchmark_result_dir,
+            messages=messages)
 
         with open(exercise_benchmark_result_dir / "result.json", "w") as f:
             json.dump(benchmark_result.dict(), f, indent=2)
 
-        return benchmark_result
-
     def _run_exercise(self,
                       exercise: str,
                       exercise_benchmark_result_dir: Path,
-                      action: WriteCodeAction,
-                      language: str = "python",
-                      verification_failure: VerificationResult = None,
-                      retry: int = 0):
-        logger.info(f"Will try to solve [{exercise}], retry: {retry}/{self.max_retries}")
+                      coder: Ghostcoder):
+        logger.info(f"Will try to solve [{exercise}]")
 
         instruction_file = exercise_benchmark_result_dir / "instructions.md"
         instructions = instruction_file.read_text()
-        implementation_file = f"{exercise}.py"  # TODO: Not only python
-        implementation_file_full_path = Path(exercise_benchmark_result_dir / implementation_file)
 
-        contents_before = implementation_file_full_path.read_text()
+        file_items = self.get_files(exercise_benchmark_result_dir)
 
-        if retry == 0:
-            message = Message(sender="Human", items=[
-                TextItem(text=instructions),
-                TextItem(text=f"""Use the above instructions to modify the supplied files: {implementation_file}
+        message = Message(sender="Human", items=[
+            TextItem(text=instructions),
+            TextItem(text=f"""Use the above instructions to modify the supplied files. 
 Keep and implement the existing function or class stubs, they will be called from existing unit tests.
-Only use standard python libraries, don't suggest installing any packages."""),
-                FileItem(file_path=implementation_file)
-            ])
+Only use standard python libraries, don't suggest installing any packages.""")
+        ] + file_items)  # TODO: Explicit mention the files that should be changed
 
-        else:
-            message = Message(sender="Human", items=[
-                TextItem(text=instructions),
-                FileItem(file_path=implementation_file),
-                TextItem(text=f"""The tests failed. 
-The tests are correct and should not be changed.
-Fix the code in {implementation_file} to resolve the errors.""")
-            ])
-
-            message.items.extend(verification_failure.failures)
-
-            test_files = self.get_test_files(failures=verification_failure.failures,
-                                             exercise_benchmark_result_dir=exercise_benchmark_result_dir)
-            message.items.extend(test_files)
-
-        response_messages = action.execute(message=message)
-        response_message = response_messages[-1]
-
-        if contents_before == implementation_file_full_path.read_text():
-            arguments = ""
-            for item in response_message.items:
-                if isinstance(item, TextItem):
-                    arguments = item.to_prompt() + "\n\n"
-
-            update_display(Pretty(f"No updated files, benchmark failed after retry {retry} the implementation can "
-                                  f"be found in directory {str(exercise_benchmark_result_dir)}"),
-                           display_id=str(exercise_benchmark_result_dir))
-            logger.info(f"No changed found in file {implementation_file}.\nResponse message:\n{arguments}")
-            return BenchmarkResult(
-                success=False,
-                exercise=exercise,
-                llm_name=self.llm_name,
-                llm_params=self.llm_params,
-                result_dir=str(exercise_benchmark_result_dir),
-                verification_result=verification_failure,
-                no_change_arguments=arguments,
-                retries=retry)
+        response_messages = coder.run(message=message)
 
         if self.language == "java":
-            verifier = JavaMvnUnit5Verifier(current_dir=exercise_benchmark_result_dir)
+            test_tool = JavaMvnUnit5TestTool(current_dir=exercise_benchmark_result_dir)
         elif self.language == "python":
-            verifier = PythonUnittestVerifier(current_dir=exercise_benchmark_result_dir)
+            test_tool = PythonUnittestTestTool(current_dir=exercise_benchmark_result_dir)
         else:
             raise ValueError(f"Unsupported language {self.language}")
 
-        verification_result = verifier.verify()
+        verification_result = test_tool.run_tests()
 
         if verification_result.success:
-            update_display(Pretty(f"Tests passed, benchmark succeeded after retry {retry}, "
-                                  f"the implementation can be found in `{str(exercise_benchmark_result_dir)}`"),
-                           display_id=str(exercise_benchmark_result_dir))
+            if self.callback:
+                self.callback.display_gc(f"Tests passed, benchmark succeeded the implementation can be found in "
+                                         f"directory `{str(exercise_benchmark_result_dir)}`")
             logger.info(f"Tests passed successfully")
             return BenchmarkResult(
                 success=True,
                 exercise=exercise,
                 llm_name=self.llm_name,
                 llm_params=self.llm_params,
-                result_dir=str(exercise_benchmark_result_dir),
-                retries=retry)
-        elif retry < self.max_retries:
-            update_display(Pretty(data=f"{len(verification_result.failures)} out of "
-                                       f"{verification_result.verification_count} tests failed, will do retry "
-                                       f"{retry + 1}/{self.max_retries}"),
-                           display_id=str(exercise_benchmark_result_dir))
-            logger.info(f"Tests failed, will retry")
-            return self._run_exercise(
-                exercise=exercise,
-                action=action,
-                exercise_benchmark_result_dir=exercise_benchmark_result_dir,
-                language=language,
-                verification_failure=verification_result,
-                retry=retry + 1)
+                result_dir=str(exercise_benchmark_result_dir)), response_messages
         else:
-            update_display(Pretty(f"{len(verification_result.failures)} out of {verification_result.verification_count}"
-                                  f" tests failed failed after retry {retry}/{self.max_retries}. Giving up. "
-                                  f"The implementation can be found in `{str(exercise_benchmark_result_dir)}`"),
-                           display_id=str(exercise_benchmark_result_dir))
+            if self.callback:
+                self.callback.display_gc(f"{len(verification_result.failures)} out of "
+                                         f"{verification_result.verification_count} tests failed. "
+                                         f"The implementation can be found in `{str(exercise_benchmark_result_dir)}`")
             logger.info(f"Tests failed, giving up")
             return BenchmarkResult(
                 success=False,
@@ -210,42 +168,44 @@ Fix the code in {implementation_file} to resolve the errors.""")
                 llm_name=self.llm_name,
                 llm_params=self.llm_params,
                 result_dir=str(exercise_benchmark_result_dir),
-                verification_result=verification_result,
-                retries=retry)
+                verification_result=verification_result), response_messages
 
-    def review_benchmark_result(self, benchmark_result: BenchmarkResult, exercise_benchmark_result_dir: Path):
+    def review_benchmark_result(self,
+                                benchmark_result: BenchmarkResult,
+                                exercise_benchmark_result_dir: Path,
+                                messages: List[Message]):
         if not self.reviewer_llm or not benchmark_result:
             return benchmark_result
 
-        if not benchmark_result.success and not benchmark_result.no_change_arguments:
-            display(Pretty(
-                "Will skip the review step as verification failed and there are no arguments for incorrect tests."))
-            return benchmark_result
-
-        display_id = benchmark_result.exercise + "review" + str(datetime.now())
-        display(Pretty(f"Review benchmark result for {benchmark_result.exercise}"), display_id=display_id)
+        if self.callback:
+            self.callback.display_gc(f"Review benchmark result for {benchmark_result.exercise}")
         logger.info(f"Reviewing benchmark result {benchmark_result}")
 
         items = []
 
-        file_items = [FileItem(file_path=str(f), readonly=True)
-                      for f in exercise_benchmark_result_dir.iterdir()
-                      if f.is_file()]
+        file_items = self.get_files(exercise_benchmark_result_dir, include_test_files=True)
 
+        items.append(TextItem(text="Review the provided code from the candidate and the conversation above."))
         if not benchmark_result.success:
-            test_fail_message = ("There are failing tests in the candidate's submission. The candidate didn't correct "
-                                 f"the code with the following arguments: \n{benchmark_result.no_change_arguments}")
-            items.append(TextItem(text=test_fail_message))
+            test_fail_message = TextItem(text="There are failing tests in the candidate's submission.")
+            items.append(test_fail_message)
             if benchmark_result.verification_result:
                 items.extend(benchmark_result.verification_result.failures)
 
         items.extend(file_items)
 
         message = Message(sender="Human", items=items)
-        test_repo = FileRepository(repo_path=str(exercise_benchmark_result_dir), use_git=False)
-        action = WriteCodeAction(llm=self.reviewer_llm, sys_prompt=FEEDBACK_SYSTEM_PROMPT, repository=test_repo,
-                                 auto_mode=True)
-        response_messages = action.execute(message)
+        test_repo = FileRepository(repo_path=exercise_benchmark_result_dir, use_git=False)
+        action = CodeWriter(llm=self.reviewer_llm,
+                            sys_prompt=FEEDBACK_SYSTEM_PROMPT,
+                            repository=test_repo,
+                            callback=self.callback,
+                            auto_mode=True)
+
+        human_message = next(([m] for m in messages if m.sender == "Human"), [])
+        ai_message = next(([m] for m in reversed(messages) if m.sender == "AI"), [])
+
+        response_messages = action.execute(human_message + ai_message + [message])
         response_message = response_messages[-1]
         for item in response_message.items:
             feedback = None
@@ -256,65 +216,41 @@ Fix the code in {implementation_file} to resolve the errors.""")
 
             if feedback:
                 benchmark_result.feedback = feedback
-                update_display(Pretty(f"Feedback: correct: {feedback.correct}, compliant: {feedback.compliant}, "
-                                      f"extra code: {feedback.extra_code}, tests correct: {feedback.tests_correct}"),
-                               display_id=display_id)
+                if self.callback:
+                    self.callback.display_gc(f"Feedback: correct: {feedback.correct}, compliant: {feedback.compliant}, "
+                                            f"extra code: {feedback.extra_code}, tests correct: {feedback.tests_correct}")
                 return benchmark_result
 
-        if not benchmark_result.feedback:
-            update_display(Pretty(f"No feedback found in response."),
-                           display_id=benchmark_result.exercise + "review")
+        if not benchmark_result.feedback and self.callback:
+            self.callback.display_gc(f"No feedback found in response.")
         return benchmark_result
 
-    def create_test_dir(self, benchmarks_dir: Path):
-        now = datetime.now()
-        now = now.strftime("%Y-%m-%d-%H-%M-%S")
-        benchmark_result_dir = Path(benchmarks_dir / now)
+    def create_test_dir(self, benchmarks_dir: Path, llm_name: str = None):
+        dir_name = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        if llm_name:
+            dir_name += "--" + llm_name
+        benchmark_result_dir = Path(benchmarks_dir / dir_name)
         benchmark_result_dir.mkdir(parents=True, exist_ok=True)
         return benchmark_result_dir
 
-    def copy_exercise(self, exercise: str, language: str = "python") -> Path:
+    def copy_exercises(self):
+        for dir in self.exercises_dir.iterdir():
+            if dir.is_dir():
+                self.copy_exercise(exercise=dir.name)
+
+    def copy_exercise(self, exercise: str):
         exercise_dir = self.exercises_dir / exercise
         exercise_benchmark_result_dir = self.benchmark_result_dir / exercise
         exercise_benchmark_result_dir.mkdir(parents=True, exist_ok=True)
         logger.debug(f"Copy exercise {exercise_dir} to {exercise_benchmark_result_dir}")
 
         shutil.copyfile(exercise_dir / "instructions.md", exercise_benchmark_result_dir / "instructions.md")
-
-        exercise_code_dir = exercise_dir / language
-
-        if language == "python":
-            test_files = [f for f in exercise_code_dir.iterdir() if
-                          f.is_file() and f.name.endswith("_test.py")]
-            test_dir = exercise_benchmark_result_dir
-            src_dir = exercise_benchmark_result_dir
-        elif language == "java":
-            test_files = [f for f in exercise_code_dir.iterdir() if
-                          f.is_file() and f.name.endswith("Test.java")]
-            test_dir = exercise_benchmark_result_dir / "src/test/java"
-            src_dir = exercise_benchmark_result_dir / "src/main/java"
-            test_dir.mkdir(parents=True, exist_ok=True)
-            src_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(exercise_code_dir / "pom.xml", exercise_benchmark_result_dir / "pom.xml")
-        else:
-            raise ValueError(f"Unsupported language {language}")
-
-        if not test_files:
-            raise ValueError(f"No test files found in {exercise_code_dir}")
-
-        for test_file in test_files:
-            shutil.copy(test_file, test_dir)
-
-        stub_dir_name = "stubs_with_comments" if self.stubs_with_comments else "stubs"
-        stub_dir = exercise_code_dir / stub_dir_name
-        if not any(stub_dir.iterdir()):
-            raise ValueError(f"No files found in {stub_dir}")
-        shutil.copytree(stub_dir, src_dir, dirs_exist_ok=True)
-
-        return exercise_benchmark_result_dir
+        exercise_code_dir = exercise_dir / self.language
+        shutil.copytree(exercise_code_dir, exercise_benchmark_result_dir, ignore=shutil.ignore_patterns(".example"), dirs_exist_ok=True)
+        logger.debug(f"Copy files from {exercise_code_dir} to {exercise_benchmark_result_dir}")
 
     def get_test_files(self, failures: List[VerificationFailureItem], exercise_benchmark_result_dir: Path):
-        parser = create_parser(language="python")  # TODO: Not only python
+        parser = create_parser(language=self.language)
         test_files = []
 
         sorted_failures = sorted(failures, key=lambda x: x.test_file)
@@ -325,9 +261,11 @@ Fix the code in {implementation_file} to resolve the errors.""")
             test_file = exercise_benchmark_result_dir / test_file_path
             test_file_block = parser.parse(test_file.read_text())
 
-            keep_blocks = [
-                CodeBlock(content="setUp(", type=CodeBlockType.FUNCTION),  # TODO: Not only python and unittest
-            ]
+            keep_blocks = []
+            if self.language == "python":
+                keep_blocks.append(
+                    CodeBlock(content="setUp(", type=CodeBlockType.FUNCTION),  # TODO: Not only python unittest
+                )
 
             for failure in grouped_failures:
                 if failure.test_method:
@@ -340,6 +278,27 @@ Fix the code in {implementation_file} to resolve the errors.""")
 
         return test_files
 
+    def get_files(self, exercise_benchmark_result_dir: Path, include_test_files: bool = False):
+        language_test_suffix = {
+            "python": "_test.py",
+            "java": "Test.java"
+        }
+
+        file_pattern = f"*{get_extension(self.language)}"
+        all_files = list(exercise_benchmark_result_dir.rglob(file_pattern))
+        file_paths = [
+            file
+            for file in all_files
+            if file.is_file()
+               and (include_test_files or not (file.name.endswith(language_test_suffix[self.language])))
+               and not file.parent.name.startswith(".")
+        ]
+
+        return [
+            FileItem(file_path="/" + str(file.relative_to(exercise_benchmark_result_dir)), content=file.read_text())
+            for file in file_paths
+        ]
+
     def run_unit_tests(self, testdir):
-        verifier = PythonUnittestVerifier(current_dir=testdir, test_file_pattern="*_test.py")  # TODO: Not only python
-        return verifier.verify()
+        verifier = PythonUnittestTestTool(current_dir=testdir, test_file_pattern="*_test.py")  # TODO: Not only python
+        return verifier.run_tests()

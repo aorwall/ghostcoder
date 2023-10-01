@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from ghostcoder.verify.verify_python_unittest import PythonUnittestVerifier
+from ghostcoder.test_tools.verify_python_unittest import PythonUnittestTestTool
 
 
 @pytest.fixture
@@ -19,7 +19,7 @@ def temp_dir():
 
 @pytest.fixture
 def verifier(temp_dir):
-    return PythonUnittestVerifier(current_dir=Path(temp_dir))
+    return PythonUnittestTestTool(current_dir=Path(temp_dir))
 
 
 def test_parse_output(temp_dir, verifier):

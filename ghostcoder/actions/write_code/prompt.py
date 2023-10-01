@@ -15,7 +15,18 @@ When you update or add a new file you must follow the rules below:
 
 ALL files should be presented in the following format:
 
-file.py
+/file.py
+```python
+# ... code  
+```
+"""
+
+FIX_TESTS_PROMPT = """You're a experienced programmer that will review a solution written by an inexperienced programmer. 
+The tests failed and you need to help the programmer to fix the code.
+
+ALL files should be presented in the following format:
+
+/file.py
 ```python
 # ... code  
 ```
@@ -99,7 +110,7 @@ When updating existing files:
 
 ALL files should be presented in the following format:
 
-file.py
+/file.py
 ```python
 # ... code  
 ```

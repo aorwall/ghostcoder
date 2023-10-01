@@ -1,1 +1,1 @@
-from ghostcoder.actions.write_code.base import WriteCodeAction
+from ghostcoder.actions.write_code.base import CodeWriter

@@ -13,6 +13,7 @@ class TestOddAnimalParty(unittest.TestCase):
     def test_multiple_common_attributes(self):
         animals = [{'color': 'red', 'legs': 4, 'size': 'big'}, {'color': 'red', 'legs': 4, 'size': 'big'}, {'color': 'red', 'legs': 4, 'size': 'big'}]
         self.assertEqual(odd_animal_party(animals), (True, 'color'))
+
     def test_valid_party(self):
         animals = [{'color': 'red', 'legs': 4}, {'color': 'red', 'legs': 2}, {'color': 'red', 'legs': 4}]
         self.assertEqual(odd_animal_party(animals), (True, 'color'))

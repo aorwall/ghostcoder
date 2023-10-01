@@ -1,0 +1,17 @@
+def test_run(self):
+    self.production_line.add_item("Item1")
+    run_thread = threading.Thread(target=self.production_line.run)
+    run_thread.start()
+    run_thread.join(timeout=5)
+    self.assertEqual(self.production_line.items, [])
+
+def test_pause_and_resume(self):
+    self.production_line.add_item("Item1")
+    self.production_line.toggle_pause()
+    run_thread = threading.Thread(target=self.production_line.run)
+    run_thread.start()
+    time.sleep(1)  # Wait for the pause to take effect
+    self.assertEqual(self.production_line.items, ["Item1"])
+    self.production_line.toggle_pause()
+    run_thread.join(timeout=5)
+    self.assertEqual(self.production_line.items, [])

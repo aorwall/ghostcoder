@@ -7,14 +7,14 @@ from typing import List, Optional
 import tiktoken
 from git import Repo, Tree
 
-from ghostcoder.schema import Folder, File, SaveFilesRequest, DiscardFilesRequest
-from ghostcoder.utils import language_by_filename
+from ghostcoder.schema import Folder, File, SaveFilesRequest, DiscardFilesRequest, FileItem
+from ghostcoder.utils import language_by_filename, get_extension
 
 
 class FileRepository:
 
     def __init__(self,
-                 repo_path: str,
+                 repo_path: Path,
                  use_git: bool = True,
                  repo: Optional[Repo] = None,
                  exclude_dirs: Optional[List[str]] = None):
@@ -40,7 +40,7 @@ class FileRepository:
     def _generate_file_tree(self, file_suffix: str = None) -> Folder:
         children = self.__generate_file_tree(tree=self.repo.tree(), file_suffix=file_suffix)
 
-        name = self.repo_path.split(os.path.sep)[-1]
+        name = self.repo_path.name
         root_dir = Folder(
             name=name,
             path="",
@@ -113,15 +113,17 @@ class FileRepository:
         file = current_folder.find(file_path)
 
         if file is None:
-            file = File(path=file_path, language=language, name=path_parts[-1], untracked=not staged, staged=staged)
+            file = File(path="/" + file_path, language=language, name=path_parts[-1], untracked=not staged, staged=staged)
             current_folder.children.append(file)
         else:
             file.staged = staged
             file.untracked = not staged
 
     def _new_files(self, dir_path: str, files: list[str]) -> list[File]:
-        return [File(name=os.path.basename(file), path=os.path.join(dir_path, file), language=language_by_filename(file), untracked=True)
-                for file in files]
+        return [
+            File(name=os.path.basename(file), path=os.path.join(dir_path, file), language=language_by_filename(file),
+                 untracked=True)
+            for file in files]
 
     def _is_binary(self, file_path: str):
         with open(file_path, 'rb') as file:
@@ -133,10 +135,35 @@ class FileRepository:
 
     def get_files_by_suffix(self, file_suffixes: List[str]) -> list[str]:
         return [file.path
-                 for file in self.file_tree().traverse()
-                 if any(file.path.endswith(suffix) for suffix in file_suffixes)]
+                for file in self.file_tree().traverse()
+                if any(file.path.endswith(suffix) for suffix in file_suffixes)]
+
+    def get_source_files(self, language: str, directory: str = None, include_test_files: bool = False):
+        language_test_suffix = {  # TODO: Move to utils
+            "python": "_test.py",
+            "java": "Test.java"
+        }
+
+        full_dir_path = self.repo_path / directory if directory else self.repo_path
+
+        file_pattern = f"*{get_extension(language)}"
+        all_files = list(full_dir_path.rglob(file_pattern))
+        file_paths = [
+            file
+            for file in all_files
+            if file.is_file() and not any(part.startswith('.') for part in file.parts)
+               and (include_test_files or not (file.name.endswith(language_test_suffix[language])))
+        ]
+
+        return [
+            FileItem(file_path="/" + str(file.relative_to(self.repo_path)), content=file.read_text())
+            for file in file_paths
+        ]
 
     def get_file_content(self, file_path: str) -> Optional[str]:
+        if file_path.startswith("/"):
+            file_path = file_path[1:]
+
         if not os.path.exists(os.path.join(self.repo_path, file_path)):
             return None
 
@@ -158,15 +185,18 @@ class FileRepository:
         new_branch.checkout()
 
     def update_file(self, file_path: str, content: str):
-        """Write file content to disk and stage the file for commit. """
-        full_path = os.path.join(self.repo_path, file_path)
+        if file_path.startswith("/"):
+            file_path = file_path[1:]
 
-        is_new = not os.path.exists(full_path)
+        """Write file content to disk and stage the file for commit. """
+        full_path = self.repo_path / file_path
+
+        is_new = not full_path.exists()
         untracked = is_new or self.repo is None or file_path in self.repo.untracked_files
 
         if is_new:
-            if os.path.sep in file_path:
-                os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            parent_path = os.path.split(full_path)[0]
+            os.makedirs(parent_path, exist_ok=True)
             old_content = []
         else:
             with open(full_path, 'r') as f:
@@ -176,7 +206,7 @@ class FileRepository:
             f.write(content)
 
         if untracked:
-            file_name = os.path.basename(file_path)
+            file_name = full_path.name
             new_content = content.splitlines(True)
             diff = ''.join(
                 difflib.unified_diff(old_content, new_content, fromfile=file_name, tofile=file_name, lineterm='\n'))

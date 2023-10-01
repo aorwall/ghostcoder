@@ -1,4 +1,5 @@
 import re
+from typing import Optional
 
 comment_marker_pattern = r"^[ \t]*(//|#|--|<!--)\s*"
 
@@ -27,6 +28,11 @@ language_extensions = {
     "xml": [".xml"]
 }
 
+def get_extension(language: str) -> Optional[str]:
+    for lang, exts in language_extensions.items():
+        if lang == language:
+            return exts[0]
+    return None
 
 def is_complete(content: str):
     lines = content.split('\n')

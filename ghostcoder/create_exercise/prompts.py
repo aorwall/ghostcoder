@@ -84,11 +84,8 @@ When writing new programming exercises you should follow the following rules:
 * The solution will solely be invoked through test cases and does not require a user interface, database connections, APIs, or command-line interfaces.
 * Do not provide any code in the instruction. 
 
-Respond with a the instructions in a backtick code block with the file name `path_to/instructions.md` preceding the code block.
-"path_to/" should be replaced with a directory name relating to the title of the exercise. Use snake_case with max 24 characters for the directory name.  
+Respond with the following format:
 
-path_to/instructions.md
-```
 # ...Title... 
 ...description...
 
@@ -103,8 +100,9 @@ path_to/instructions.md
 ## Evaluation Criteria
 1. ...
 2. ...
-```
 """
+
+DIRECTORY_NAME_PROMPT = """Come up with a directory name for the exercise. It should be in snake_case with max 24 characters. Only return the directory name."""
 
 FILE_SCOPE = "* The solution should be possible to implement in a single file. "
 FUNCTION_SCOPE = "* The instructions should eb for a solution small and simple enough to implement in a single function. "
@@ -298,30 +296,29 @@ CREATE_STUBS_FEW_SHOTS = [
     Message(sender="Human", items=[
         FileItem(file_path=f"{EXAMPLE_EXERCISE_NAME}/instructions.md", content=EXAMPLE_INSTRUCTION, read_only=True),
         FileItem(file_path=f"{EXAMPLE_EXERCISE_NAME}/python/{EXAMPLE_EXERCISE_NAME}.py", content=EXAMPLE_IMPLEMENTATION, read_only=True),
-        FileItem(file_path=f"{EXAMPLE_EXERCISE_NAME}/python/stubs/{EXAMPLE_EXERCISE_NAME}.py", content=None),
-        FileItem(file_path=f"{EXAMPLE_EXERCISE_NAME}/python/stubs_with_comments/{EXAMPLE_EXERCISE_NAME}.py", content=None),
     ]),
     Message(sender="AI", items=[
-        FileItem(file_path=f"{EXAMPLE_EXERCISE_NAME}/python/stubs/{EXAMPLE_EXERCISE_NAME}.py", content=EXAMPLE_STUB),
-        FileItem(file_path=f"{EXAMPLE_EXERCISE_NAME}/python/stubs_with_comments/{EXAMPLE_EXERCISE_NAME}.py", content=EXAMPLE_STUB_WITH_COMMENTS),
+        FileItem(file_path=f"{EXAMPLE_EXERCISE_NAME}/python/{EXAMPLE_EXERCISE_NAME}.py", content=EXAMPLE_STUB_WITH_COMMENTS),
     ])
 ]
 
-CREATE_STUBS_SYSTEM_PROMPT = """You are a staff engineer at a large company, you have been given an programming exercise 
+CREATE_STUBS_SYSTEM_PROMPT = PromptTemplate.from_template("""You are a staff engineer at a large company, you have been given an programming exercise 
 with a test suite and a reference implementation. 
 
 The individual who will do the exercise will not have access to these tests, and the verification will be conducted automatically without human intervention.
 
-To assist in this process, you should create skeletal code files (also known as a file stubs) from the reference implementation. These files should contain only 
-the functions and structures essential for running the tests. All other implementation details should be handled by the 
-person completing the exercise.
-
-Create on file stub with comments on what to implement and create one without. Use an appropriate comment format for the programming language used.
+To assist in this process, you should replace existing files with skeletal code files (also known as a file stubs) from the reference implementation. These files should contain only 
+the functions and structures essential for running the tests. All other implementation details should be written by the person doing the exercise.
 
 Please adhere to the following rules:
 * There should be no contradictions between the file stub and the instructions.
 * The interfaces in the file stub code should clearly specify the types, data structures, etc., needed to run the tests.
-"""
+{language_specifics}
+""")
+
+CREATE_STUBS_PYTHON_RULES = """* Use docstrings to create comments for each method and class."""
+
+CREATE_STUBS_JAVA_RULES = """* Use Javadoc to create comments for each method and class."""
 
 VERIFY_TEST_SYSTEM_PROMPT = """The programming exercise can be found in the file instructions.md. 
 Accompanying these instructions is an example implementation and a test suite to verify that the requirements have been implemented correctly.

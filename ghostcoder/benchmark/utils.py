@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from langchain.chat_models import ChatOpenAI
@@ -6,12 +7,15 @@ from ghostcoder.callback import LogCallbackHandler
 from ghostcoder.llm import ChatLLMWrapper
 from ghostcoder.llm.wizardcoder import WizardCoderLLMWrapper
 
+logger = logging.getLogger(__name__)
 
-def create_openai_client(log_dir: Path, llm_name: str, temperature: float):
+def create_openai_client(log_dir: Path, llm_name: str, temperature: float, streaming: bool = True):
     callback = LogCallbackHandler(str(log_dir))
+    logger.info(f"create_openai_client(): llm_name={llm_name}, temperature={temperature}, log_dir={log_dir}")
     return ChatLLMWrapper(ChatOpenAI(
         model=llm_name,
         temperature=temperature,
+        streaming=streaming,
         callbacks=[callback]
     ))
 

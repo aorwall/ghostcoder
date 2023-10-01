@@ -1,0 +1,42 @@
+ 0 module ``
+  1 import `import React, { useState } from 'react';`
+  1 class `interface MyComponentProps`
+   2 block_delimiter `{`
+   2 code `initialCount?: number`
+   2 block_delimiter `;`
+   2 block_delimiter `}`
+  1 class `const MyComponent: React.FC<MyComponentProps> = ({ initialCount = 0 }) =>`
+   2 block_delimiter `{`
+   2 code `const [count, setCount]`
+    3 code `=`
+    3 code `useState`
+     4 code `(initialCount)`
+    3 block_delimiter `;`
+   2 function `const resetCount = () =>`
+    3 block_delimiter `{`
+    3 code `setCount`
+     4 code `(initialCount)`
+     4 block_delimiter `;`
+    3 block_delimiter `}`
+    3 block_delimiter `;`
+   2 statement `return`
+    3 block_delimiter `(`
+    3 code `<div>`
+     4 code ``
+     4 code `<p>You clicked`
+      5 block_delimiter `{`
+      5 code `count`
+      5 block_delimiter `}`
+      5 code `times`
+      5 code `</p>`
+     4 code ``
+     4 code `<button onClick={() => setCount(count + 1)}>`
+      5 code `Click me`
+      5 code `</button>`
+     4 code ``
+     4 code `</div>`
+    3 block_delimiter `)`
+    3 block_delimiter `;`
+   2 block_delimiter `}`
+  1 code `export default MyComponent;`
+  1 space ``

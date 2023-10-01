@@ -1,0 +1,24 @@
+ 0 module ``
+  1 function `const asyncFunction = async () =>`
+   2 block_delimiter `{`
+   2 statement `return`
+    3 code `new Promise((resolve, reject) =>`
+     4 block_delimiter `{`
+     4 code `setTimeout(() =>`
+      5 block_delimiter `{`
+      5 code `resolve`
+       6 code `('Async function resolved')`
+       6 block_delimiter `;`
+      5 block_delimiter `}`
+      5 code `,`
+      5 code `1000`
+      5 block_delimiter `)`
+      5 block_delimiter `;`
+     4 block_delimiter `}`
+     4 block_delimiter `)`
+    3 block_delimiter `;`
+   2 block_delimiter `}`
+   2 block_delimiter `;`
+  1 code `asyncFunction().then(console.log).catch`
+   2 code `(console.error)`
+   2 block_delimiter `;`

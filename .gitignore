@@ -1,4 +1,6 @@
-playground
+# Ghostcoder stuff
+.prompt_log
+benchmark-results
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

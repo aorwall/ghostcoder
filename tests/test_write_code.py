@@ -1,6 +1,7 @@
 import logging
 import os
 import tempfile
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
@@ -8,7 +9,7 @@ from langchain.schema import LLMResult
 from langchain.schema.language_model import BaseLanguageModel
 
 from ghostcoder import FileRepository
-from ghostcoder.actions.write_code.base import WriteCodeAction, extract_response_parts, CodeBlock
+from ghostcoder.actions.write_code.base import CodeWriter, extract_response_parts, CodeBlock
 from ghostcoder.llm import LLMWrapper
 from ghostcoder.llm.phind import PhindLLMWrapper
 from ghostcoder.schema import Message, TextItem, FileItem, Stats
@@ -47,9 +48,12 @@ def test_crlf_line_breaks(mock_llm_wrapper):
 def test_not_similar_blocks(mock_llm_wrapper):
     verify_execute(mock_llm_wrapper, "not_similar_blocks", "precision_cut.py")
 
+def test_new_file_many_blocks(mock_llm_wrapper):
+    verify_execute(mock_llm_wrapper, "new_file_many_blocks", "battleship.py")
+
 
 def test_expect_one_file(mock_llm_wrapper):
-    prompt = WriteCodeAction(llm=mock_llm_wrapper, expect_one_file=True)
+    prompt = CodeWriter(llm=mock_llm_wrapper, expect_one_file=True)
     verify_execute(mock_llm_wrapper, "expect_one_file", "hello_world.py", prompt=prompt)
 
 def test_updated_content_is_invalid(mock_llm):
@@ -74,7 +78,7 @@ def test_updated_content_is_invalid(mock_llm):
             response2
         ]
 
-        prompt = WriteCodeAction(llm=PhindLLMWrapper(mock_llm), repository=repository, auto_mode=True)
+        prompt = CodeWriter(llm=PhindLLMWrapper(mock_llm), repository=repository, auto_mode=True)
 
         response = prompt.execute(Message(
             sender="Human",
@@ -113,7 +117,7 @@ def test_not_closed_code_block(mock_llm):
             response2
         ]
 
-        prompt = WriteCodeAction(llm=PhindLLMWrapper(mock_llm), repository=repository, auto_mode=True)
+        prompt = CodeWriter(llm=PhindLLMWrapper(mock_llm), repository=repository, auto_mode=True)
 
         response = prompt.execute(Message(
             sender="Human",
@@ -152,7 +156,7 @@ def test_update_with_non_code_block_in_input(mock_llm_wrapper): # and test merge
 
         mock_llm_wrapper.generate.return_value = response, Stats()
 
-        prompt = WriteCodeAction(llm=mock_llm_wrapper, repository=repository, auto_mode=True)
+        prompt = CodeWriter(llm=mock_llm_wrapper, repository=repository, auto_mode=True)
 
         response = prompt.execute(Message(
             sender="Human",
@@ -171,12 +175,12 @@ def test_update_with_non_code_block_in_input(mock_llm_wrapper): # and test merge
 
 
 
-def verify_execute(mock_llm, test_dir, code_file, prompt: WriteCodeAction = None):
+def verify_execute(mock_llm, test_dir, code_file, prompt: CodeWriter = None):
     with open(f"resources/{test_dir}/response.txt", 'r') as f:
         response = f.read()
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        repository = FileRepository(repo_path=tmpdir, use_git=False)
+        repository = FileRepository(repo_path=Path(tmpdir), use_git=False)
         full_path = tmpdir + "/" + code_file
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
 
@@ -188,13 +192,13 @@ def verify_execute(mock_llm, test_dir, code_file, prompt: WriteCodeAction = None
         mock_llm.generate.return_value = response, Stats()
 
         if prompt is None:
-            prompt = WriteCodeAction(llm=mock_llm, repository=repository)
+            prompt = CodeWriter(llm=mock_llm, repository=repository)
         else:
             prompt.repository = repository
 
-        response = prompt.execute(Message(
+        response = prompt.execute([Message(
             sender="Human",
-            items=[TextItem(text=""), FileItem(file_path=code_file)]))
+            items=[TextItem(text=""), FileItem(file_path=code_file)])])
 
         with open(f"resources/{test_dir}/expected.py", 'r') as f:
             expected = f.read()

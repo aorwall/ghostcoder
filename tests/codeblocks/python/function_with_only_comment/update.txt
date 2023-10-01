@@ -1,0 +1,12 @@
+class BowlingGame:
+    def __init__(self):
+        self.rolls = []
+
+    def roll(self, pins):
+        self.rolls.append(pins)
+
+    def score(self):
+        # ... rest of the code
+
+    def is_strike(self, pins):
+        return pins == 10
