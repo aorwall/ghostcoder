@@ -7,31 +7,42 @@ import streamlit as st
 from langchain.callbacks.base import BaseCallbackHandler
 
 from ghostcoder import Ghostcoder
-from ghostcoder.schema import TextItem
+from ghostcoder.assistant import Assistant
+from ghostcoder.schema import TextItem, Item, FunctionItem, Message
 
 # openai.api_key = st.secrets["OPENAI_API_KEY"]
-
 
 logging_format = '%(asctime)s - %(levelname)s - %(message)s'
 logging.basicConfig(level=logging.INFO, format=logging_format)
 logging.getLogger('ghostcoder').setLevel(logging.DEBUG)
+logging.getLogger('httpx').setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
-class StreamHandler(BaseCallbackHandler):
 
-    def __init__(self, container, initial_text="", display_method='markdown'):
+class CallbackHandler:
+
+    def __init__(self, container, display_method='markdown'):
         self.container = container
-        self.text = initial_text
+        self.items = []
         self.display_method = display_method
 
-    def on_llm_new_token(self, token: str, **kwargs) -> None:
-        self.text += token
+    def on_new_items(self, new_items: Item):
+        for new_item in new_items:
+            self.on_new_item(new_item)
+
+    def on_new_item(self, new_item: Item):
+        logger.info("on_new_item")
+        self.items.append(new_item)
+
         display_function = getattr(self.container, self.display_method, None)
         if display_function is not None:
-            display_function(self.text)
+            if isinstance(new_item, TextItem):
+                display_function(new_item.text)
+            elif isinstance(new_item, FunctionItem):
+                display_function(new_item.dict())
         else:
-            raise ValueError(f"Invalid display_method: {self.display_method}")
+            logger.error(f"Invalid display_method: {self.display_method}")
 
 
 with st.sidebar:
@@ -45,46 +56,13 @@ with st.sidebar:
     else:
         init_button = st.button("Reload")
 
-        ability_options = [("Auto", None), ("Investigate", "investigate"), ("Write code", "write_code")]
-        ability = st.radio("Select Ability:",
-                                   ability_options,
-                                   format_func=lambda x: x[0],
-                                   captions=[
-                                       "Automatically select ability based on the prompt.",
-                                       "Find files and answer questions about the code base.",
-                                       "Write and save code to the repository."]
-                                   )
-
-        search_limit = number = st.number_input('File search hits', value=10, min_value=0, max_value=50)
-
-        file_type = st.radio(
-            "File types",
-            ["Code files", "Test files", "All files"])
-
-        #show_filesystem = st.toggle('Show filesystem', True)
-
-        new_file = st.text_input("File path")
-
-        if st.button("Add file to context"):
-            if new_file:
-                st.session_state.ghostcoder.add_file_to_context(new_file)
-                st.rerun()
-
-        st.caption(f'**{st.session_state.ghostcoder.get_file_context_tokens()}** tokens in file context.')
-
-        for idx, item in enumerate(st.session_state.ghostcoder.get_file_context()):
-            col1, col2 = st.columns([4, 1])
-            col1.write(item)
-            if col2.button(f"X", key=f"remove_{idx}"):
-                st.session_state.ghostcoder.remove_file_from_context(item)
-                st.rerun()
 
 if init_button:
-    if repo_dir: # openai_api_key and
+    if repo_dir:  # openai_api_key and
         st.session_state.messages = []
 
         with st.spinner('Indexing repository...'):
-            st.session_state.ghostcoder = Ghostcoder(repo_dir=repo_dir, debug_mode=debug_mode, model_name=model_name)
+            st.session_state.ghostcoder = Assistant(repo_dir=repo_dir, debug_mode=debug_mode, model_name=model_name)
 
         # Set OpenAI API key
         # openai.api_key = openai_api_key
@@ -97,35 +75,37 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+    with st.chat_message(message.sender):
+        for item in message.items:
+            if isinstance(item, TextItem):
+                st.markdown(item.text)
+            elif isinstance(item, FunctionItem):
+                header = f"{item.function}("
+                for i, arg in enumerate(item.arguments):
+                    if i > 0:
+                        header += ", "
+                    header += f"{arg}"
+                header += ")"
+
+                with st.expander(header):
+                    if item.output:
+                        st.text("Output")
+                        st.json(item.output)
 
 if prompt := st.chat_input("Ask about anything"):
     if "ghostcoder" not in st.session_state:
         st.error("Please index the repository first.")
         st.stop()
 
-    st.session_state.messages.append({"role": "user", "content": prompt})
-
-    with st.chat_message("user"):
+    st.session_state.messages.append(Message(sender="human", items=[TextItem(text=prompt)]))
+    with st.chat_message("human"):
         st.markdown(prompt)
 
     message_placeholder = st.empty()
-    stream_handler = StreamHandler(message_placeholder, display_method='write')
+    callback = CallbackHandler(message_placeholder, display_method='write')
 
-    content_type = None
-    if file_type == "Code files":
-        content_type = "code"
-    elif file_type == "Test files":
-        content_type = "test"
-
-    response = st.session_state.ghostcoder.request(prompt,
-                                                   callback=stream_handler,
-                                                   ability=ability,
-                                                   content_type=content_type,
-                                                   search_limit=search_limit,)
-
-    message_placeholder.markdown(response)
-    st.session_state.messages.append({"role": "assistant", "content": response})
+    with st.spinner('Wait for it...'):
+        message = st.session_state.ghostcoder.run(prompt, callback=callback)
+        st.session_state.messages.append(message)
 
     st.rerun()

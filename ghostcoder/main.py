@@ -7,15 +7,17 @@ from langchain.callbacks.base import BaseCallbackHandler
 from langchain.chat_models import ChatOpenAI
 from llama_index.vector_stores import ChromaVectorStore
 
-from ghostcoder.actions.write_code import CodeWriter
+from ghostcoder.write_code import CodeWriter
 from ghostcoder.actions.verify.code_verifier import CodeVerifier
 from ghostcoder.actions.write_code.prompt import FIX_TESTS_PROMPT
 from ghostcoder.callback import LogCallbackHandler
 from ghostcoder.codeblocks import CodeBlockType, create_parser
+from ghostcoder.display_callback import DisplayCallback
 from ghostcoder.filerepository import FileRepository
 from ghostcoder.index.code_index import CodeIndex
 from ghostcoder.llm import LLMWrapper, ChatLLMWrapper
-from ghostcoder.schema import Message, UpdatedFileItem, TextItem, FileItem, SearchFileResult, ReadFileResponse
+from ghostcoder.schema import Message, UpdatedFileItem, TextItem, FileItem, FindFilesResponse, ReadFileResponse, \
+    WriteCodeResponse, BaseResponse
 from ghostcoder.test_tools import TestTool
 from ghostcoder.utils import count_tokens
 
@@ -60,7 +62,7 @@ class Ghostcoder:
                  test_tool: TestTool = None,
                  auto_mode: bool = True,
                  language: str = None,
-                 callback = None,
+                 callback: DisplayCallback = None,
                  max_retries: int = 3,
                  log_dir: str = None,
                  openai_api_key: str = None,
@@ -87,24 +89,15 @@ class Ghostcoder:
         vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
         self.code_index = code_index or CodeIndex(repository=self.repository, index_dir=self.index_dir, vector_store=vector_store, limit=search_limit)
 
-        self.code_writer = CodeWriter(llm=self.llm ,
-                                      sys_prompt=code_writer_sys_prompt,
-                                      repository=self.repository,
-                                      callback=callback,
-                                      expect_complete_functions=True,
-                                      auto_mode=False)
+        self.code_writer = CodeWriter()
 
-        self.test_fix_writer = CodeWriter(llm=self.llm,
-                                          sys_prompt=FIX_TESTS_PROMPT,
-                                          repository=self.repository,
-                                          callback=callback,
-                                          auto_mode=True)
         self.max_retries = max_retries
         self.auto_mode = auto_mode
         self.callback = callback
 
         self.message_history = []
         self.file_context = []
+        self.updated_files = []
 
         if verify_code:
             self.verifier = CodeVerifier(repository=self.repository, test_tool=test_tool, language=language, callback=callback)
@@ -112,7 +105,7 @@ class Ghostcoder:
             self.verifier = None
 
         self.debug_mode = debug_mode
-        self.file_context = []
+        self.file_context: List[FileItem] = []
 
         self.filter_context = False
 
@@ -162,8 +155,10 @@ You have access to the following abilities you can call:
 
         return outgoing_messages + self.write_code(query, callback)
 
-    def write_code(self, query: str, callback: BaseCallbackHandler = None) -> List[Message]:
-        logger.info(f"Write code")
+    def write_code(self, file_path: str, code: str) -> WriteCodeResponse:
+        logger.info(f"Write code to file path {file_path}. \n```\n{code}\n```")
+
+        # TODO: Check if branch is not trunk
 
         debug_text_before = f"> _Provided files from file context:_"
         for i, file_item in enumerate(self.file_context):
@@ -172,23 +167,40 @@ You have access to the following abilities you can call:
         debug_text_before += "\n\n"
 
         if self.debug_mode:
-            callback.on_llm_new_token(debug_text_before)
+            logger.debug(debug_text_before)
 
-        incoming_messages = []
-        incoming_messages.append(Message(sender="User", items=self.file_context))
-        incoming_messages.extend(self.message_history)
-        incoming_messages.append(Message(sender="User", items=[TextItem(text=query)]))
+        updated_file = self.code_writer.write_code(code=code, file_path=file_path, existing_files=self.file_context)
+        if updated_file.invalid:
+            logger.info(f"Updated code is invalid, {updated_file.invalid}")
+            return WriteCodeResponse(success=False, error=updated_file.invalid)
 
-        return self.code_writer.execute(incoming_messages=incoming_messages, callback=callback)
+        logger.info(f"Updated code diff:\n{updated_file.diff}")
 
-    def find_files(self, query: str, search_limit: int = 10, content_type: str = None) -> SearchFileResult:
+        updated_file_item = next((item for item in self.updated_files if item.file_path == updated_file.file_path), None)
+        if not updated_file_item:
+            self.updated_files.append(updated_file)
+        else:
+            updated_file_item.content = updated_file.content
+
+        if self.debug_mode:
+            debug_text_after = f"\n\n> _Updated file:_\n> {updated_file.file_path}\n```diff\n{updated_file.diff}\n```"
+            logger.debug(debug_text_after)
+
+        diff = self.repository.update_file(file_path=updated_file.file_path, content=updated_file.content)
+        return WriteCodeResponse(git_diff=diff,
+                                 content_after_update=updated_file.content,
+                                 file_path=updated_file.file_path,
+                                 branch_name=self.repository.active_branch)
+
+    def find_files(self, description: str, search_limit: int = 10, content_type: str = None) -> FindFilesResponse:
         if not self.code_index:
             raise Exception("Code index not initialized.")
 
-        hits = self.code_index.search(query, content_type=content_type, limit=search_limit)
+        hits = self.code_index.search(description, content_type=content_type, limit=search_limit)
 
         files = []
-        debug_text_before = f"> _Vector store search hits : {len(hits)}_"
+        debug_text_before = (f"> _Query: : {description}_\n"
+                             f"> _Vector store search hits : {len(hits)}_")
         for i, hit in enumerate(hits):
             if self.debug_mode:
                 debug_text_before += f"\n> {i + 1}. `{hit.path}` ({len(hit.blocks)} blocks "
@@ -201,7 +213,11 @@ You have access to the following abilities you can call:
             content = self.repository.get_file_content(file_path=hit.path)
             files.append(FileItem(file_path=hit.path, content=content))
 
-        return SearchFileResult(files=files)
+        logging.debug(debug_text_before)
+
+        self.file_context = files
+
+        return FindFilesResponse(files=files)
 
     def read_file(self, file_path: str) -> ReadFileResponse:
         contents = self.repository.get_file_content(file_path=file_path)
@@ -320,7 +336,6 @@ When you return code you should use the following format:
 
         return False
 
-
     def run(self, message: Message) -> List[Message]:
         file_items = message.find_items_by_type(item_type="file")
         for file_item in file_items:
@@ -413,6 +428,31 @@ When you return code you should use the following format:
                     summarized_messages.append(Message(sender=message.sender, items=[TextItem(text=message.summary)]))
 
         return summarized_messages
+
+    def create_branch(self, name: str = None) -> BaseResponse:
+        try:
+            self.repository.create_branch(name)
+        except Exception as e:
+            return BaseResponse(success=False, error=f"Failed to create branch {name}: {e}")
+
+        try:
+            self.repository.checkout(name)
+        except Exception as e:
+            logger.warning(f"Failed to checkout branch {name}: {e}")
+            return BaseResponse(success=False, error=f"Failed to checkout branch {name}: {e}")
+
+        return BaseResponse(success=True)
+
+    def discard_changes(self, file_paths: List[str] = None) -> BaseResponse:
+        try:
+            if file_paths:
+                self.repository.discard_files(file_paths=file_paths)
+            else:
+                self.repository.discard_all_files()
+        except Exception as e:
+            return BaseResponse(success=False, error=f"Failed to discard changes for {file_paths}: {e}")
+
+        return BaseResponse(success=True)
 
     def get_file_context(self):
         files = [file.file_path for file in self.file_context]

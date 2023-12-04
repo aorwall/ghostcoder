@@ -6,7 +6,6 @@ from typing import List
 
 from ghostcoder.codeblocks import CodeBlockType, CodeBlock, create_parser
 from ghostcoder.filerepository import FileRepository
-from ghostcoder.ipython_callback import DisplayCallback
 from ghostcoder.schema import Message, TextItem, VerificationFailureItem, FileItem
 from ghostcoder.test_tools import TestTool, JavaMvnUnit5TestTool
 from ghostcoder.test_tools.verify_python_pytest import PythonPytestTestTool
@@ -17,7 +16,7 @@ class CodeVerifier:
     def __init__(self,
                  repository: FileRepository,
                  test_tool: TestTool = None,
-                 callback: DisplayCallback = None,
+                 callback=None,  # FIXME
                  language: str = "python"):
         self.repository = repository
 

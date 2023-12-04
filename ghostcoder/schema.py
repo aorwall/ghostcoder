@@ -21,7 +21,7 @@ class Item(BaseModel):
 
 class TextItem(Item):
     type: str = "text"
-    text: str = Field(default="", description="text")
+    text: str = Field(description="text")
     need_input: bool = Field(default=False, description="if more input is needed")
 
     def __str__(self) -> str:
@@ -85,7 +85,6 @@ class FileItem(CodeItem):
     readonly: bool = Field(default=False, description="Is the file readonly")
     new: bool = Field(default=False, description="If the file is new and doesn't exist in the repository")
     priority: int = Field(default=0, description="Priority of the file, higher is more important and will be taken into account when trimming the prompt context")
-    stop_sequence: str = Field(default="")
 
     @root_validator(pre=True)
     def set_language(cls, values):
@@ -94,7 +93,7 @@ class FileItem(CodeItem):
         if file_path and not language:
             values["language"] = language_by_filename(file_path)
 
-        if not file_path.startswith("/"):
+        if file_path and not file_path.startswith("/"):
             values["file_path"] = "/" + file_path
         return values
 
@@ -106,11 +105,7 @@ class FileItem(CodeItem):
         if self.readonly:
             readonly_str = " (readonly)"
 
-        stop_sequence = ""
-        if self.stop_sequence:
-            stop_sequence = f"{self.stop_sequence}\n"
-
-        return f"\n{self.file_path}{readonly_str}\n{super().to_prompt(style=style)}\n{stop_sequence}"
+        return f"\n{self.file_path}{readonly_str}\n{super().to_prompt(style=style)}"
 
     def to_history(self) -> str:
         return f"{self.file_path}"
@@ -141,8 +136,8 @@ class FileItem(CodeItem):
 
 class UpdatedFileItem(FileItem):
     type: str = "updated_file"
-    file_path: str = Field(description="file to update or create")
-    error: Optional[str] = Field(default=None, description="error message")
+    file_path: Optional[str] = Field(default=None, description="file to update or create")
+    new_updates: Optional[str] = Field(default=None, description="provided changes")
     diff: Optional[str] = Field(default=None, description="diff of the file")
     invalid: Optional[str] = Field(default=None, description="file is invalid")
     created: bool = Field(default=False, description="file is created")
@@ -168,10 +163,23 @@ class UpdatedFileItem(FileItem):
         elif self.error:
             return f"{self.file_path} (error: {self.error})\n```{self.language}\n{self.content}\n```"
 
-        return f"{self.file_path}\n```{self.language}\n{self.diff}\n```"
+        return f"{self.file_path}\n```{self.language}\n{self.content}\n```"
 
     def to_history(self) -> str:
         return str(self)
+
+
+class FunctionItem(Item):
+    type: str = "function"
+    function: str = Field(description="name of the function")
+    arguments: dict = Field(default=None, description="arguments")
+    output: dict = Field(default=None, description="output")
+
+    def __str__(self) -> str:
+        return self.function  # TODO
+
+    def to_prompt(self, style: Optional[str] = None) -> str:
+        return self.function  # TODO
 
 
 class ItemHolder(BaseModel):
@@ -188,10 +196,14 @@ class ItemHolder(BaseModel):
             item_type = item.get("type")
             if item_type == "text":
                 parsed_items.append(TextItem(**item))
+            if item_type == "function":
+                parsed_items.append(TextItem(**item))
             elif item_type == "code":
                 parsed_items.append(CodeItem(**item))
             elif item_type == "file":
                 parsed_items.append(FileItem(**item))
+            elif item_type == "function":
+                parsed_items.append(FunctionItem(**item))
             elif item_type == "updated_file":
                 parsed_items.append(UpdatedFileItem(**item))
             else:
@@ -380,3 +392,20 @@ class Difficulty(Enum):
     EASY = "easy"
     MEDIUM = "medium"
     HARD = "hard"
+
+class BaseResponse(BaseModel):
+    success: bool = True
+    error: Optional[str] = None
+
+class FindFilesResponse(BaseResponse):
+    files: List[FileItem]
+
+class ReadFileResponse(BaseResponse):
+    file_path: str
+    contents: Optional[str] = None
+
+class WriteCodeResponse(BaseResponse):
+    file_path: str
+    git_diff: str
+    content_after_update: str
+    branch_name: str

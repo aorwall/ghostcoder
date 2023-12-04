@@ -6,7 +6,6 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
-from ghostcoder.ipython_callback import DisplayCallback
 from ghostcoder.schema import VerificationFailureItem, VerificationResult
 from ghostcoder.test_tools.test_tool import TestTool
 
@@ -18,7 +17,7 @@ class JavaMvnUnit5TestTool(TestTool):
     def __init__(self,
                  test_file_pattern: str = "*Test.java",
                  current_dir: Optional[Path] = None,
-                 callback: DisplayCallback = None,
+                 callback=None,
                  timeout: Optional[int] = 5):
         self.test_file_pattern = test_file_pattern
         self.timeout = timeout

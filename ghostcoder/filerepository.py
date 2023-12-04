@@ -10,6 +10,7 @@ from git import Repo, Tree
 from ghostcoder.schema import Folder, File, SaveFilesRequest, DiscardFilesRequest, FileItem
 from ghostcoder.utils import language_by_filename, get_extension, get_type_by_filepath
 
+logger = logging.getLogger(__name__)
 
 class FileRepository:
 
@@ -25,6 +26,7 @@ class FileRepository:
             self.repo = repo if repo else Repo(path=repo_path)
             if not self.repo.heads:
                 raise Exception("Git repository has no heads, you need to do an initial commit.")
+            self._current_branch = self.repo.active_branch.name
         else:
             self.repo = None
 
@@ -199,6 +201,17 @@ class FileRepository:
             tokens = self.enc.encode(file)
             return len(tokens)
 
+    @property
+    def active_branch(self):
+        return self._current_branch
+
+    def create_branch(self, branch_name: str):
+        if branch_name in self.repo.heads:
+            raise Exception(f"Branch {branch_name} already exists.")
+
+        self.repo.create_head(branch_name)
+        logger.info(f"Created branch: {branch_name}")
+
     def checkout(self, branch_name: str):
         if branch_name not in self.repo.heads:
             new_branch = self.repo.create_head(branch_name)
@@ -206,6 +219,8 @@ class FileRepository:
             new_branch = self.repo.heads[branch_name]
 
         new_branch.checkout()
+        self._current_branch = branch_name
+        logger.info(f"Active branch: {branch_name}")
 
     def update_file(self, file_path: str, content: str):
         if file_path.startswith("/"):
@@ -240,36 +255,37 @@ class FileRepository:
     def get_diff(self):
         return self.repo.git.diff('--staged')
 
-    def save_files(self, request: SaveFilesRequest):
+    def stage_files(self, file_paths: List[str]):
         """Stage the files for commit."""
 
-        if request.file_paths:
-            for file_path in request.file_paths:
-                self.save_file(file_path)
-        else:
-            self.save_all_files()
+        for file_path in file_paths:
+            self.stage_file(file_path)
 
-    def save_file(self, file_path: str):
+    def stage_file(self, file_path: str):
         logging.info(f"Staging file {file_path} to commit.")
+
+        if file_path.startswith("/"):
+            file_path = file_path[1:]
+
         self.repo.git.add(file_path)
         self.repo.index.write()
 
-    def save_all_files(self):
+    def stage_all_files(self):
         logging.info(f"Stage all files to commit.")
         self.repo.git.add("-A")
         self.repo.index.write()
 
-    def discard_files(self, request: DiscardFilesRequest):
+    def discard_files(self, file_paths: List[str]):
         """Discards the changes by resetting the file to HEAD."""
 
-        if request.file_paths:
-            for file_path in request.file_paths:
-                self.discard_file(file_path)
-        else:
-            self.discard_all_files()
+        for file_path in file_paths:
+            self.discard_file(file_path)
 
     def discard_file(self, file_path: str):
         """Discards the changes by resetting the file to HEAD."""
+
+        if file_path.startswith("/"):
+            file_path = file_path[1:]
 
         if file_path in self.repo.untracked_files:
             logging.info(f"Discard file {file_path} by running clean -df")

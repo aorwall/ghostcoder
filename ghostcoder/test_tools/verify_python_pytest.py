@@ -5,7 +5,6 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional
 
-from ghostcoder.ipython_callback import DisplayCallback
 from ghostcoder.schema import VerificationFailureItem, VerificationResult
 from ghostcoder.test_tools.test_tool import TestTool
 
@@ -16,7 +15,7 @@ class PythonPytestTestTool(TestTool):
     def __init__(self,
                  test_file_pattern: str = "*",
                  current_dir: Optional[Path] = None,
-                 callback: DisplayCallback = None,
+                 callback = None,
                  parse_test_results: bool = True,
                  include_test_code: bool = False,
                  timeout: Optional[int] = 30):

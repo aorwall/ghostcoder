@@ -12,6 +12,7 @@ human_img = '<img alt="🧑" class="imga"width="25" height="25" src="data:image/
 class DisplayCallback:
 
     def __init__(self, display_id: str = None):
+
         self.display_id = display_id
         self.text = ""
 

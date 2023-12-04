@@ -1,9 +1,8 @@
 import difflib
 import logging
 import re
-from dataclasses import dataclass
 from enum import Enum
-from typing import List, Union, Tuple, Any
+from typing import List, Union, Any
 from typing import Optional
 from uuid import UUID
 
@@ -17,7 +16,6 @@ from ghostcoder.actions.base import BaseAction
 from ghostcoder.actions.write_code.prompt import get_implement_prompt, ROLE_PROMPT, FEW_SHOTS_PYTHON
 from ghostcoder.codeblocks import create_parser, CodeBlockType
 from ghostcoder.filerepository import FileRepository
-from ghostcoder.ipython_callback import DisplayCallback
 from ghostcoder.llm.base import LLMWrapper
 from ghostcoder.schema import Message, FileItem, Stats, TextItem, UpdatedFileItem, CodeItem
 from ghostcoder.utils import is_complete
@@ -40,7 +38,7 @@ class OutputFormat(str, Enum):
 
 class StreamCallback(BaseCallbackHandler):
 
-    def __init__(self, callback: DisplayCallback):
+    def __init__(self, callback): # FIXME
         self.callback = callback
 
     def on_llm_new_token(
@@ -113,7 +111,7 @@ def extract_response_parts(response: str) -> List[Union[str, CodeBlock]]:
     file_pattern = re.compile(r"`([\w/]+\.\w{1,4})`")
 
     # Pattern to check if the filename stands alone on the last line
-    standalone_file_pattern = re.compile(r'^(?:"|`)?(?P<filename>[\w\s\-/\\]+\.\w{1,4})(?:"|`)?$', re.IGNORECASE)
+    standalone_file_pattern = re.compile(r'^(?:"|`)?(?P<filename>[\w\s\-./\\]+\.\w{1,4})(?:"|`)?$', re.IGNORECASE)
 
     last_end = 0
 
@@ -190,9 +188,8 @@ class CodeWriter(BaseAction):
                  guess_similar_files: bool = True,
                  expect_one_file: bool = False,
                  allow_hallucinated_files: bool = False,
-                 expect_updated_code: bool = False,
                  expect_complete_functions: bool = True,
-                 callback: DisplayCallback = None,
+                 callback = None, # FIXME
                  max_tokens_in_prompt: int = None,
                  tries: int = 3):
         if not sys_prompt:
@@ -209,7 +206,6 @@ class CodeWriter(BaseAction):
         self.expect_one_file = expect_one_file
         self.expect_complete_functions = expect_complete_functions
         self.allow_hallucinations = allow_hallucinated_files
-        self.expect_updated_code = expect_updated_code
         self.callback = callback
         self.max_tokens_in_prompt = max_tokens_in_prompt
         self.output_parser = PydanticOutputParser(pydantic_object=CodeChanges)
@@ -269,23 +265,6 @@ class CodeWriter(BaseAction):
         items, retry_inputs = self.handle_response(blocks, file_items, stats)
         updated_files_str = ""
 
-        did_changes = False
-        for item in items:
-            if item.type == "updated_file":
-                if not item.invalid and self.repository:
-                    try:
-                        diff = self.repository.update_file(item.file_path, item.content)
-                        item.diff = diff
-                        if not bool(diff):
-                            item.invalid = "no_change"
-                        else:
-                            did_changes = True
-                    except Exception as e:
-                        item.error = f"Failed to update file {item.file_path}: {e}"
-                        stats.increment("failed_to_update_file")
-                        logger.error(item.error)
-                updated_files_str += f"\n- {item.to_log()}"
-
         if updated_files_str:
             logger.info(f"Updated files: {updated_files_str}")
         else:
@@ -297,9 +276,6 @@ class CodeWriter(BaseAction):
             self.callback.display_message(ai_message)
 
         outgoing_messages = [ai_message]
-
-        if self.expect_updated_code and not did_changes:
-            retry_inputs.append(TextItem(text="You did not update any files. Please update the code and try again."))
 
         if self.auto_mode and retry_inputs:
             retry += 1
@@ -416,9 +392,8 @@ class CodeWriter(BaseAction):
                 block.file_path = file_item.file_path
 
 
-    def updated_file(self, stats: Stats, block: CodeBlock, existing_file_item: FileItem, file_items: List[FileItem]) -> Tuple[Optional[UpdatedFileItem], List[TextItem]]:
+    def updated_file(self, block: CodeBlock, existing_file_item: FileItem, file_items: List[FileItem]) -> Optional[UpdatedFileItem]:
         logger.debug("Received file block: [{}]".format(block.file_path))
-        stats.increment("file_item")
 
         retry_inputs = []
 
@@ -435,12 +410,11 @@ class CodeWriter(BaseAction):
                 file_path=existing_file_item.file_path,
                 content=updated_content,
                 invalid="readonly",
-            ), retry_inputs
+            )
 
         # Don't merge and mark as invalid if hallucinated files isn't allowed
         if not existing_file_item and not self.allow_hallucinations:
             logger.info(f"Could not find file {block.file_path} in initial message")
-            stats.increment("missing_file")
             available_files = ", ".join([f"`{f.file_path}`" for f in file_items])
             retry_inputs.append(TextItem(text=f"I only expected the following files in the response {available_files}. "
                                               f"But `{block.file_path} was returned."))
@@ -448,71 +422,71 @@ class CodeWriter(BaseAction):
                 file_path=block.file_path,
                 content=updated_content,
                 invalid="hallucination",
-            ), retry_inputs
+            )
 
         # Just return the updated content if original file is empty
         if existing_file_item and not existing_file_item.content:
             return UpdatedFileItem(
                 file_path=existing_file_item.file_path,
                 content=updated_content
-            ), retry_inputs
+            )
 
         parser = None
-        if block.language in ["python", "java", "typescript", "javascript"]:
-            try:
-                parser = create_parser(block.language)
-            except Exception as e:
-                logger.warning(f"Could not create parser for language {block.language}: {e}")
+        try:
+            parser = create_parser(block.language, apply_gpt_tweaks=True)
+        except Exception as e:
+            logger.warning(f"Could not create parser for language {block.language}: {e}")
 
         if parser:
             try:
                 updated_block = parser.parse(updated_content)
             except Exception as e:
                 logger.warning(f"Could not parse updated  in {block.file_path}: {e}")
-                stats.increment("invalid_code_block")
                 retry_input = f"You returned a file with the following invalid code blocks: \n" + updated_content
-                return None, [TextItem(text=retry_input)]
+                return UpdatedFileItem(
+                    file_path=existing_file_item.file_path,
+                    content=updated_content,
+                    invalid="error"
+                )
 
-            incomplete_blocks = updated_block.find_incomplete_blocks_with_types([CodeBlockType.CONSTRUCTOR, CodeBlockType.FUNCTION])
             error_blocks = updated_block.find_errors()
             if error_blocks:
-                stats.increment("files_with_errors")
                 logger.info("The updated file {} has errors. ".format(block.file_path))
                 retry_inputs.append(
                     TextItem(text="You returned a file with syntax errors. Find them and correct them."))
-                invalid = "syntax_error"
+
                 for error_block in error_blocks:
                     retry_inputs.append(
                         CodeItem(language=block.language, content=error_block.to_string()))
-            elif self.expect_complete_functions and incomplete_blocks:
-                incomplete_blocks_str = ", ".join([f"`{block.identifier}`" for block in incomplete_blocks])
-                logger.info(f"The content in the function block [{incomplete_blocks_str} in [{block.file_path}] is not complete, will retry")
-                stats.increment("not_complete_function")
-                invalid = "not_complete"
+                return UpdatedFileItem(
+                    file_path=existing_file_item.file_path,
+                    content=updated_content,
+                    invalid="syntax_error"
+                )
 
-                retry_inputs.append(
-                    TextItem(text=f"You did not return all code in the functions {incomplete_blocks_str}. "
-                                  f"You must return all code in these functions and don't replace any code with comments."))
-            elif existing_file_item and not existing_file_item.readonly:
+            if self.expect_complete_functions:
+                incomplete_blocks = updated_block.find_incomplete_blocks_with_types(
+                    [CodeBlockType.CONSTRUCTOR, CodeBlockType.FUNCTION, CodeBlockType.TEST_CASE])
+                if incomplete_blocks:
+                    incomplete_blocks_str = ", ".join([f"`{block.identifier}`" for block in incomplete_blocks])
+                    logger.info(f"The content in the function block [{incomplete_blocks_str} in [{block.file_path}] is not complete, will retry")
+                    return UpdatedFileItem(
+                        file_path=existing_file_item.file_path,
+                        content=updated_content,
+                        invalid="not_complete"
+                    )
+
+            if existing_file_item and not existing_file_item.readonly:
                 original_block = parser.parse(existing_file_item.content)
 
                 try:
-                    gpt_tweaks = original_block.merge(updated_block,
-                                                      first_level=True,
-                                                      replace_types=[CodeBlockType.FUNCTION, CodeBlockType.STATEMENT, CodeBlockType.CONSTRUCTOR])  # TODO: Make this configurable
-                    stats.increment("merged_file")
-                    if gpt_tweaks:
-                        tweaks = "\n - ".join(gpt_tweaks)
-                        logger.info(f"Applied GPT tweaks:\n - {tweaks}")
-                        stats.extra["gpt_tweaks"] = gpt_tweaks
-                        stats.increment("did_gpt_tweaks")
+                    original_block.merge(updated_block)
 
                     updated_content = original_block.to_string()
 
                     merged_block = parser.parse(updated_content)
                     error_blocks = merged_block.find_errors()
                     if error_blocks:
-                        stats.increment("merged_files_with_errors")
                         logger.info("The merged file {} has errors..".format(block.file_path))
                         retry_inputs.append(
                             TextItem(text="You returned a file with syntax errors. Find them and correct them."))
@@ -522,14 +496,12 @@ class CodeWriter(BaseAction):
                                                          file_path=block.file_path))
                 except ValueError as e:
                     logger.info(f"Could not merge {block.file_path}: {e}")
-                    stats.increment("could_not_merge_file")
                     retry_inputs.append(
                         TextItem(text="I could not merge the updated code with the original code. "
                                       "Please return all code from the original file."))
                     invalid = "could_not_merge"
         if not retry_inputs and not is_complete(updated_content):
             logger.info(f"The content in block [{block.file_path}] is not complete, will retry")
-            stats.increment("not_complete_file")
             retry_inputs.append(
                 TextItem(text=f"You did just return parts of the code in the file. Return all code from the original code in the update file {block.file_path}."))
             invalid = "not_complete"
@@ -540,20 +512,16 @@ class CodeWriter(BaseAction):
                            updated_content=updated_content)
             if not diff:
                 invalid = "no_change"
-                stats.increment("no_change")
 
             if existing_file_item.readonly:
                 invalid = "readonly"
-                stats.increment("updated_readonly_file")
 
         elif self.repository.get_file_content(block.file_path):
             # TODO: Check in context if the file is mentioned or listed in earlier messages
             logger.info(f"{block.file_path} not found in initial message but exists in repo, will assume"
                          f"that it's a hallucination and ignore the file.")
-            stats.increment("hallucinated_file")
             invalid = "hallucinated"
         else:
-            stats.increment("new_file")
             logger.debug(f"{block.file_path} not found in initial message, assume new file.")
             new = True
 
@@ -564,7 +532,8 @@ class CodeWriter(BaseAction):
             error=warning,
             invalid=invalid,
             new=new
-        ), retry_inputs
+        )
+
 
     def has_not_closed_code_blocks(self, text):
         lines = text.split("\n")
