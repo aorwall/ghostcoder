@@ -37,9 +37,13 @@ class CodeWriter(ABC):
                    code: str,
                    language: str = None,
                    file_path: Optional[str] = None,
-                   existing_files: List[FileItem] = []) -> UpdatedFileItem:
-        existing_file_item = self.find_matching_file_item(code, file_path=file_path, language=language, file_items=existing_files)
-        return self.update_file(code, file_path=file_path, language=language, existing_file_item=existing_file_item)
+                   original_file: Optional[FileItem] = None,
+                   file_context: List[FileItem] = []) -> UpdatedFileItem:
+
+        if not original_file:
+            original_file = self.find_matching_file_item(code, file_path=file_path, language=language, file_items=file_context)
+
+        return self.update_file(code, file_path=file_path, language=language, existing_file_item=original_file)
 
     def find_matching_file_item(self,
                                 code: str,
@@ -145,7 +149,7 @@ class CodeWriter(ABC):
                 updated_block = parser.parse(updated_content)
             except Exception as e:
                 logger.warning(f"Could not parse updated in {file_path}: {e}")
-                return invalid_update("could_not_parse")
+                return invalid_update("Couldn't parse the content, please provide valid code.")
 
             error_blocks = updated_block.find_errors()
             if error_blocks:
@@ -173,15 +177,15 @@ class CodeWriter(ABC):
                     error_blocks = merged_block.find_errors()
                     if error_blocks:
                         logger.info("The merged file {} has errors.".format(file_path))
-                        return invalid_update("syntax_error", updated_content=updated_content)
+                        return invalid_update("Couldn't merge the updated content to the existing file. Please provide the complete contents of the existing file when updating it.", updated_content=updated_content)
 
                     if not original_block.is_complete():
                         logger.info(f"The merged content for [{file_path}] is not complete")
-                        return invalid_update("not_complete",  updated_content=updated_content)
+                        return invalid_update("Couldn't merge the updated content to the existing file. Please provide the complete contents of the existing file when updating it.",  updated_content=updated_content)
 
                 except ValueError as e:
                     logger.info(f"Could not merge {file_path}: {e}")
-                    return invalid_update("could_not_merge")
+                    return invalid_update("Couldn't merge the updated content to the existing file. Please provide the complete contents of the existing file when updating it.")
         elif not is_complete(updated_content):
             return invalid_update("No code isn't complete, provide the missing code.")
 

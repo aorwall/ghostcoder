@@ -18,7 +18,8 @@ class FileRepository:
                  repo_path: Path,
                  use_git: bool = True,
                  repo: Optional[Repo] = None,
-                 exclude_dirs: Optional[List[str]] = None):
+                 exclude_dirs: Optional[List[str]] = None,
+                 include_dirs: Optional[List[str]] = None):
         super().__init__()
         self.repo_path = repo_path
 
@@ -32,7 +33,7 @@ class FileRepository:
 
         self.enc = tiktoken.get_encoding("cl100k_base")
 
-        self.exclude_dirs = [".gcoder"]
+        self.exclude_dirs = [".gcoder", ".index"]
         if exclude_dirs:
             self.exclude_dirs.extend(exclude_dirs)
 
@@ -182,6 +183,16 @@ class FileRepository:
 
         with open(os.path.join(self.repo_path, file_path), 'r') as f:
             return f.read()
+
+    def get_file(self, file_path: str) -> Optional[FileItem]:
+        if file_path.startswith("/"):
+            file_path = file_path[1:]
+
+        if not os.path.exists(os.path.join(self.repo_path, file_path)):
+            return None
+
+        with open(os.path.join(self.repo_path, file_path), 'r') as f:
+            return FileItem(file_path=file_path, content=f.read())
 
     def find_files_in_content(self, content=str, folder: Folder=None):
         folder = folder or self.file_tree()

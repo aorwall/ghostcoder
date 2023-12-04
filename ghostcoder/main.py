@@ -17,7 +17,8 @@ from ghostcoder.filerepository import FileRepository
 from ghostcoder.index.code_index import CodeIndex
 from ghostcoder.llm import LLMWrapper, ChatLLMWrapper
 from ghostcoder.schema import Message, UpdatedFileItem, TextItem, FileItem, FindFilesResponse, ReadFileResponse, \
-    WriteCodeResponse, BaseResponse
+    WriteCodeResponse, BaseResponse, ListFilesResponse, ListFilesRequest, WriteCodeRequest, CreateBranchRequest, \
+    ReadFileRequest, FindFilesRequest
 from ghostcoder.test_tools import TestTool
 from ghostcoder.utils import count_tokens
 
@@ -75,19 +76,23 @@ class Ghostcoder:
 
         self.repository = repository or FileRepository(repo_path=Path(repo_dir), exclude_dirs=exclude_dirs)
 
-        repo_dir = repo_dir or repository.repo_path
-        log_dir = log_dir or repo_dir + "/.prompt_log"
+        log_dir = log_dir or repository.repo_path / ".prompt_log"
         log_path = Path(log_dir)
-        self.llm = llm or create_openai_client(log_dir=log_path, llm_name=model_name, temperature=0.01, streaming=True, max_tokens=2000, openai_api_key=openai_api_key)
-        self.basic_llm = basic_llm or create_openai_client(log_dir=log_path, llm_name="gpt-3.5-turbo", temperature=0.0, streaming=True, openai_api_key=openai_api_key)
+        #self.llm = llm or create_openai_client(log_dir=log_path, llm_name=model_name, temperature=0.01, streaming=True, max_tokens=2000, openai_api_key=openai_api_key)
+        #self.basic_llm = basic_llm or create_openai_client(log_dir=log_path, llm_name="gpt-3.5-turbo", temperature=0.0, streaming=True, openai_api_key=openai_api_key)
 
-        self.index_dir = index_dir or repo_dir + "/.index"
+        self.index_dir = index_dir or str(repository.repo_path / ".index")
 
         import chromadb
         db = chromadb.PersistentClient(path=self.index_dir + "/.chroma_db")
         chroma_collection = db.get_or_create_collection("code-index")
         vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
-        self.code_index = code_index or CodeIndex(repository=self.repository, index_dir=self.index_dir, vector_store=vector_store, limit=search_limit)
+
+        try:
+            self.code_index = code_index or CodeIndex(repository=self.repository, index_dir=self.index_dir, vector_store=vector_store, limit=search_limit)
+        except Exception as e:
+            logger.warning(f"Failed to create code index: {e}")
+            self.code_index = None
 
         self.code_writer = CodeWriter()
 
@@ -155,8 +160,8 @@ You have access to the following abilities you can call:
 
         return outgoing_messages + self.write_code(query, callback)
 
-    def write_code(self, file_path: str, code: str) -> WriteCodeResponse:
-        logger.info(f"Write code to file path {file_path}. \n```\n{code}\n```")
+    def write_code(self, request: WriteCodeRequest) -> WriteCodeResponse:
+        logger.info(f"Write code to file path {request.file_path}. \n```\n{request.contents}\n```")
 
         # TODO: Check if branch is not trunk
 
@@ -169,10 +174,30 @@ You have access to the following abilities you can call:
         if self.debug_mode:
             logger.debug(debug_text_before)
 
-        updated_file = self.code_writer.write_code(code=code, file_path=file_path, existing_files=self.file_context)
-        if updated_file.invalid:
-            logger.info(f"Updated code is invalid, {updated_file.invalid}")
-            return WriteCodeResponse(success=False, error=updated_file.invalid)
+        existing_file = self.repository.get_file(request.file_path)
+        if request.new_file:
+            if existing_file:
+                return WriteCodeResponse(success=False,
+                                         file_path=request.file_path,
+                                         error=f"An existing file found.")
+
+            updated_file = UpdatedFileItem(file_path=request.file_path, content=request.contents)
+            self.file_context.append(updated_file)
+        else:
+            if not existing_file:
+                return WriteCodeResponse(success=False,
+                                         file_path=request.file_path,
+                                         error=f"No existing file found.")
+
+            updated_file = self.code_writer.write_code(code=request.contents,
+                                                       file_path=request.file_path,
+                                                       original_file=existing_file)
+            if updated_file.invalid:
+                logger.info(f"Updated code is invalid, {updated_file.invalid}")
+                return WriteCodeResponse(success=False,
+                                         file_path=request.file_path,
+                                         content_after_update=updated_file.content,
+                                         error=updated_file.invalid)
 
         logger.info(f"Updated code diff:\n{updated_file.diff}")
 
@@ -192,14 +217,42 @@ You have access to the following abilities you can call:
                                  file_path=updated_file.file_path,
                                  branch_name=self.repository.active_branch)
 
-    def find_files(self, description: str, search_limit: int = 10, content_type: str = None) -> FindFilesResponse:
+    def get_all_files(self):
+        for file in self.repository.file_tree().traverse():
+            try:
+                parser = create_parser(file.language)
+            except Exception as e:
+                logger.info(f"Failed to create parser for language {file.language}: {e}")
+
+    def list_files(self, request: ListFilesRequest) -> ListFilesResponse:
+        files = []
+        for file in self.repository.file_tree().traverse():
+            file_contents = self.repository.get_file_content(file.path)
+            logger.info(f"Found for content {file.path}")
+
+            if file_contents:
+                try:
+                    parser = create_parser(file.language)
+                    code_block = parser.parse(file_contents)
+                    trimmed_block = code_block.trim_with_types(include_types=[CodeBlockType.FUNCTION, CodeBlockType.CLASS])
+                    file_contents = str(trimmed_block)
+                    logger.info(f"Trimmed content {file_contents}")
+                except Exception as e:
+                    logger.info(f"Failed to parse file {file.path}: {e}")
+                    file_contents = None
+
+            files.append(FileItem(file_path=file.path, content=file_contents))
+
+        return ListFilesResponse(files=files)
+
+    def find_files(self, request: FindFilesRequest) -> FindFilesResponse:
         if not self.code_index:
             raise Exception("Code index not initialized.")
 
-        hits = self.code_index.search(description, content_type=content_type, limit=search_limit)
+        hits = self.code_index.search(request.description, limit=20)
 
         files = []
-        debug_text_before = (f"> _Query: : {description}_\n"
+        debug_text_before = (f"> _Query: : {request.description}_\n"
                              f"> _Vector store search hits : {len(hits)}_")
         for i, hit in enumerate(hits):
             if self.debug_mode:
@@ -219,11 +272,11 @@ You have access to the following abilities you can call:
 
         return FindFilesResponse(files=files)
 
-    def read_file(self, file_path: str) -> ReadFileResponse:
-        contents = self.repository.get_file_content(file_path=file_path)
+    def read_file(self, request: ReadFileRequest) -> ReadFileResponse:
+        contents = self.repository.get_file_content(file_path=request.file_path)
         if not contents:
-            return ReadFileResponse(success=False, file_path=file_path, error=f"File {file_path} not found.")
-        return ReadFileResponse(success=True, file_path=file_path, contents=contents)
+            return ReadFileResponse(success=False, file_path=request.file_path, error=f"File not found.")
+        return ReadFileResponse(success=True, file_path=request.file_path, contents=contents)
 
     def investigate(self, query: str,
                     search_limit: int = 10,
@@ -429,17 +482,18 @@ When you return code you should use the following format:
 
         return summarized_messages
 
-    def create_branch(self, name: str = None) -> BaseResponse:
+    def create_branch(self, request: CreateBranchRequest) -> BaseResponse:
+        branch_name = request.branch_name
         try:
-            self.repository.create_branch(name)
+            self.repository.create_branch(branch_name)
         except Exception as e:
-            return BaseResponse(success=False, error=f"Failed to create branch {name}: {e}")
+            return BaseResponse(success=False, error=f"Failed to create branch {branch_name}: {e}")
 
         try:
-            self.repository.checkout(name)
+            self.repository.checkout(branch_name)
         except Exception as e:
-            logger.warning(f"Failed to checkout branch {name}: {e}")
-            return BaseResponse(success=False, error=f"Failed to checkout branch {name}: {e}")
+            logger.warning(f"Failed to checkout branch {branch_name}: {e}")
+            return BaseResponse(success=False, error=f"Failed to checkout branch {branch_name}: {e}")
 
         return BaseResponse(success=True)
 

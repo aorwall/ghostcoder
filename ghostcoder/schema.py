@@ -397,15 +397,36 @@ class BaseResponse(BaseModel):
     success: bool = True
     error: Optional[str] = None
 
+class FindFilesRequest(BaseModel):
+    description: str = Field(description="Detailed description of the files to find")
+    file_extensions: List[str] = Field(default=None, description="List of file extensions to find")
+    directory: str = Field(default=None, description="Path to the directory to find files in.")
+    names: List[str] = Field(default=None, description="List of file names to find")
+    purpose: str = Field(default="any", description="Purpose of the files to find", enum=["test", "code", "any"])
+
+class ListFilesResponse(BaseResponse):
+    files: List[FileItem] = Field(default=[], description="List of files in the repository")
+
 class FindFilesResponse(BaseResponse):
     files: List[FileItem]
+
+class ReadFileRequest(BaseModel):
+    file_path: str = Field(description="Path to the file to read")
 
 class ReadFileResponse(BaseResponse):
     file_path: str
     contents: Optional[str] = None
 
+class WriteCodeRequest(BaseModel):
+    file_path: str = Field(description="Path to the file to write")
+    contents: str = Field(description="Contents of the file")
+    new_file: bool = Field(default=False, description="If the file is new and doesn't exist in the repository")
+
 class WriteCodeResponse(BaseResponse):
-    file_path: str
-    git_diff: str
-    content_after_update: str
-    branch_name: str
+    file_path: str = Field(description="Path to the file to write")
+    git_diff: str = Field(default=None, description="Diff of the file")
+    content_after_update: str = Field(default=None, description="Contents of the file after update")
+    branch_name: str = Field(default=None, description="Name of the branch")
+
+class CreateBranchRequest(BaseModel):
+    branch_name: str = Field(description="Name of the branch")
