@@ -8,7 +8,7 @@ import tiktoken
 from git import Repo, Tree
 
 from ghostcoder.schema import Folder, File, SaveFilesRequest, DiscardFilesRequest, FileItem
-from ghostcoder.utils import language_by_filename, get_extension, get_type_by_filepath
+from ghostcoder.utils import language_by_filename, get_extension, get_purpose_by_filepath
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +18,7 @@ class FileRepository:
                  repo_path: Path,
                  use_git: bool = True,
                  repo: Optional[Repo] = None,
-                 exclude_dirs: Optional[List[str]] = None,
-                 include_dirs: Optional[List[str]] = None):
+                 exclude_dirs: Optional[List[str]] = None):
         super().__init__()
         self.repo_path = repo_path
 
@@ -76,7 +75,7 @@ class FileRepository:
 
                 language = language_by_filename(item.path)
 
-                content_type = get_type_by_filepath(language, item.path)
+                content_type = get_purpose_by_filepath(language, item.path)
 
                 nodes.append(File(name=item.name, path=item.path, language=language, content_type=content_type))
             elif item.type == "tree":
@@ -89,6 +88,9 @@ class FileRepository:
                 nodes.append(folder)
         nodes.sort(key=lambda x: x.name)
         return nodes
+
+    def _build_file(self, file_path: str, staged: bool = False) -> File:
+        return File(path=file_path, staged=staged)
 
     def add_file_to_tree(self, root: Folder, path: str, staged: bool):
         full_path = os.path.join(self.repo_path, path)
@@ -119,7 +121,7 @@ class FileRepository:
         file = current_folder.find(file_path)
 
         if file is None:
-            file = File(path="/" + file_path, language=language, name=path_parts[-1], untracked=not staged, staged=staged)
+            file = self._build_file(file_path, staged)
             current_folder.children.append(file)
         else:
             file.staged = staged

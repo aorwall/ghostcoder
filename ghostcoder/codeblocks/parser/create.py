@@ -12,8 +12,8 @@ def create_parser(language: str, **kwargs) -> Optional[CodeParser]:
     #    return JavaParser(**kwargs)
     if language == "python":
         return PythonParser(**kwargs)
-    elif language == "typescript" or language == "tsx":
-        return TypeScriptParser(language, **kwargs)
+    elif language == "typescript":
+        return TypeScriptParser("tsx", **kwargs)
     elif language == "javascript":
         return JavaScriptParser(language, **kwargs)
     else:

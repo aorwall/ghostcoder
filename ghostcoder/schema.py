@@ -6,6 +6,7 @@ from langchain.callbacks.openai_info import get_openai_token_cost_for_model, MOD
 from marshmallow import ValidationError
 from pydantic import BaseModel, Field, validator, root_validator
 
+from ghostcoder.codeblocks import CodeBlock
 from ghostcoder.utils import language_by_filename
 
 
@@ -325,13 +326,10 @@ class MergeResponse(BaseModel):
 
 
 class File(BaseModel):
+    type: str = "file"
     path: str
-    language: str
-    name: str = ""  # TODO: remove this?
     last_modified: float = 0
     staged: bool = False
-    untracked: bool = False
-    content_type: Optional[str] = None
 
 
 class Folder(BaseModel):
@@ -371,9 +369,16 @@ class Folder(BaseModel):
                 sub_tree = child.tree_string(content_type=content_type, indent=indent + 2)
                 if sub_tree:
                     file_tree += sub_tree
-            elif not content_type or content_type == child.content_type:
+            elif not content_type or content_type == child.purpose:
                 file_tree += " " * (indent) + name + "\n"
         return file_tree
+
+
+class CodeFile(File):
+    type: str = "code"
+    blocks: List[CodeBlock] = Field(default=[], description="Code blocks in the file")
+    language: str = Field(default=None, description="Programming language")
+    purpose: Optional[str] = Field(default=None, description="Purpose of the file", enum=["test", "code", "any"])
 
 
 class SaveFilesRequest(BaseModel):
@@ -398,17 +403,20 @@ class BaseResponse(BaseModel):
     error: Optional[str] = None
 
 class FindFilesRequest(BaseModel):
-    description: str = Field(description="Detailed description of the files to find")
-    file_extensions: List[str] = Field(default=None, description="List of file extensions to find")
-    directory: str = Field(default=None, description="Path to the directory to find files in.")
+    description: Optional[str] = Field(default=None, description="Detailed description of the files to find")
+    language: Optional[str] = Field(default=None, description="Programming language of the files to find")
+    directory: Optional[str] = Field(default=None, description="Path to the directory to find files in.")
     names: List[str] = Field(default=None, description="List of file names to find")
-    purpose: str = Field(default="any", description="Purpose of the files to find", enum=["test", "code", "any"])
-
-class ListFilesResponse(BaseResponse):
-    files: List[FileItem] = Field(default=[], description="List of files in the repository")
+    purpose: Optional[str] = Field(default="any", description="Purpose of the files to find", enum=["test", "code", "any"])
 
 class FindFilesResponse(BaseResponse):
     files: List[FileItem]
+
+class ListFilesRequest(BaseModel):
+    directory: str = Field(default=None, description="Path to the directory to find files in.")
+
+class ListFilesResponse(BaseResponse):
+    files: List[FileItem] = Field(default=[], description="List of files in the repository")
 
 class ReadFileRequest(BaseModel):
     file_path: str = Field(description="Path to the file to read")

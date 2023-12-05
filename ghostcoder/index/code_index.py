@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import List, Optional
 
 from llama_index import ServiceContext, StorageContext, load_index_from_storage, VectorStoreIndex, Document, \
@@ -8,6 +9,7 @@ from llama_index.response_synthesizers import ResponseMode
 from llama_index.vector_stores.types import VectorStore, ExactMatchFilter, MetadataFilters
 from pydantic import BaseModel, Field
 
+from ghostcoder.codeblocks.coderepository import CodeRepository
 from ghostcoder.filerepository import FileRepository
 from ghostcoder.index.node_parser import CodeNodeParser
 
@@ -90,26 +92,35 @@ class CodeIndex:
     def _get_documents(self):
         documents = []
         for file in self.repository.file_tree().traverse():
-            if file.language in ["python", "java", "javascript", "typescript", "tsx"]:  # TODO: only supported
-                data = self.repository.get_file_content(file.path)
+            data = self.repository.get_file_content(file.path)
+
+            file_extension = file.path.split(".")[-1]
+
+            if file.type == "code":
                 metadata = {
                     "path": file.path,
+                    "file_extension": file_extension,
                     "language": file.language or "unknown",
-                    "type": file.content_type or "code",
+                    "purpose": file.purpose or "code",
+                }
+            else:
+                metadata = {
+                    "path": file.path,
+                    "file_extension": file_extension,
+                    "language": "not_applicable",
+                    "purpose": "other",
                 }
 
-                doc = Document(text=data, metadata=metadata)
-                doc.id_ = str(file.path)
+            doc = Document(text=data, metadata=metadata)
+            doc.id_ = str(file.path)
 
-                documents.append(doc)
+            documents.append(doc)
         return documents
 
-    def search(self, query: str, content_type: str = None, limit: int = None):
-        #filters = [ExactMatchFilter(key="block_type", value=str(block_type)) for block_type in block_types]
+    def search(self, query: str, filter_values: dict = None, limit: int = None):
         filters = []
-
-        if content_type:
-            filters.append(ExactMatchFilter(key="type", value=content_type))
+        for key, value in filter_values.items():
+            filters.append(ExactMatchFilter(key=key, value=value))
 
         retriever = self._index.as_retriever(similarity_top_k=limit or self.limit, filters=MetadataFilters(filters=filters))
 
@@ -147,3 +158,9 @@ class CodeIndex:
         #query_engine = self._index.as_query_engine()
         response = query_engine.query(query)
         return response
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
+    repository = CodeRepository(Path("/home/albert/repos/albert/ghostcoder"))
+    index = CodeIndex(repository=repository, index_dir="/home/albert/repos/albert/ghostcoder/index", reload=True)

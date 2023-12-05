@@ -67,9 +67,6 @@ class CodeNodeParser(NodeParser):
                     continue
 
                 codeblock = parser.parse(content)
-                logging.debug(codeblock.to_tree(include_tree_sitter_type=False,
-                                                show_tokens=True,
-                                                include_types=[CodeBlockType.FUNCTION, CodeBlockType.CLASS]))
 
                 splitted_blocks = codeblock.split_blocks()
 
@@ -77,16 +74,30 @@ class CodeNodeParser(NodeParser):
                     definitions, parent = self.get_parent_and_definitions(splitted_block)
 
                     node_metadata = node.metadata
+
+                    if splitted_block.type in [CodeBlockType.TEST_CASE, CodeBlockType.TEST_SUITE]:
+                        node_metadata["purpose"] = "test"
+
                     node_metadata["block_type"] = str(splitted_block.type)
+
+                    if splitted_block.identifier:
+                        node_metadata["identifier"] = str(splitted_block.identifier)
 
                     tokens = count_tokens(parent.to_string())
                     if tokens > 4000:
                         logging.info(
                             f"Skip node [{splitted_block.identifier}] in {node.id_} with {tokens} tokens")
+                        logging.debug(codeblock.to_tree(include_tree_sitter_type=False,
+                                                        show_tokens=True,
+                                                        include_types=[CodeBlockType.FUNCTION, CodeBlockType.CLASS]))
+
                         continue
 
                     if tokens > 1000:
                         logging.info(f"Big node [{splitted_block.identifier}] in {node.id_} with {tokens} tokens")
+                        logging.debug(codeblock.to_tree(include_tree_sitter_type=False,
+                                                        show_tokens=True,
+                                                        include_types=[CodeBlockType.FUNCTION, CodeBlockType.CLASS]))
 
                     # TODO: Add relationships between code blocks
                     node = TextNode(

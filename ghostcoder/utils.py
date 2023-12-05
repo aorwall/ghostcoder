@@ -24,8 +24,7 @@ language_extensions = {
 #    "ruby": [".rb"],
 #    "swift": [".swift"],
 #    "kotlin": [".kt"],
-    "typescript": [".ts"],
-    "tsx": [".tsx"],
+    "typescript": [".ts", ".tsx"],
 #    "json": [".json"],
 #    "sql": [".sql"],
 #    "yaml": [".yaml", ".yml"],
@@ -35,11 +34,10 @@ language_extensions = {
 test_file_path_patterns = {
     "javascript": ["__tests__", "__mocks__"],
     "typescript": ["__tests__", "__mocks__"],
-    "tsx": ["__tests__", "__mocks__"],
     "java": ["src/test"],
 }
 
-def get_type_by_filepath(language, file_path):  # TODO: Check content in file also
+def get_purpose_by_filepath(language, file_path):  # TODO: Check content in file also
     if not language:
         return "file"
 

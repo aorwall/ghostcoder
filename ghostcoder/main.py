@@ -246,27 +246,27 @@ You have access to the following abilities you can call:
         return ListFilesResponse(files=files)
 
     def find_files(self, request: FindFilesRequest) -> FindFilesResponse:
-        if not self.code_index:
-            raise Exception("Code index not initialized.")
+        if self.code_index:
+            hits = self.code_index.search(request.description, limit=40)
 
-        hits = self.code_index.search(request.description, limit=20)
+            files = []
+            debug_text_before = (f"> _Query: : {request.description}_\n"
+                                 f"> _Vector store search hits : {len(hits)}_")
+            for i, hit in enumerate(hits):
+                if self.debug_mode:
+                    debug_text_before += f"\n> {i + 1}. `{hit.path}` ({len(hit.blocks)} blocks "
+                    debug_text_before += ", ".join([f"`{block.identifier}`" for block in hit.blocks])
+                    debug_text_before += ")"
 
-        files = []
-        debug_text_before = (f"> _Query: : {request.description}_\n"
-                             f"> _Vector store search hits : {len(hits)}_")
-        for i, hit in enumerate(hits):
-            if self.debug_mode:
-                debug_text_before += f"\n> {i + 1}. `{hit.path}` ({len(hit.blocks)} blocks "
-                debug_text_before += ", ".join([f"`{block.identifier}`" for block in hit.blocks])
-                debug_text_before += ")"
+                if any([hit.path in item.file_path for item in files]):
+                    continue
 
-            if any([hit.path in item.file_path for item in files]):
-                continue
+                content = self.repository.get_file_content(file_path=hit.path)
+                files.append(FileItem(file_path=hit.path, content=content))
 
-            content = self.repository.get_file_content(file_path=hit.path)
-            files.append(FileItem(file_path=hit.path, content=content))
+            logging.debug(debug_text_before)
 
-        logging.debug(debug_text_before)
+
 
         self.file_context = files
 

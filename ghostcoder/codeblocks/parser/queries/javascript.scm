@@ -55,19 +55,6 @@
   )
 ) @root
 
-(field_definition
-  (property_identifier) @identifier
-  (arrow_function
-    parameters: (formal_parameters) @definition.function
-    body: [
-      (statement_block
-        ("{") @child.first
-      )
-      (expression) @child.first
-    ]
-  )
-) @root
-
 (expression_statement
   [
     (assignment_expression
