@@ -1,8 +1,10 @@
 import difflib
 import logging
 import os
+from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import tiktoken
 from git import Repo, Tree
@@ -12,13 +14,20 @@ from ghostcoder.utils import language_by_filename, get_extension, get_purpose_by
 
 logger = logging.getLogger(__name__)
 
+class ContextScope(Enum):
+    LISTED = "listed"
+    READ = "read"
+    UPDATED = "updated"
+
+
 class FileRepository:
 
     def __init__(self,
                  repo_path: Path,
                  use_git: bool = True,
                  repo: Optional[Repo] = None,
-                 exclude_dirs: Optional[List[str]] = None):
+                 exclude_dirs: Optional[List[str]] = None,
+                 ignore_hidden: bool = True):
         super().__init__()
         self.repo_path = repo_path
 
@@ -27,69 +36,93 @@ class FileRepository:
             if not self.repo.heads:
                 raise Exception("Git repository has no heads, you need to do an initial commit.")
             self._current_branch = self.repo.active_branch.name
+
+            logger.debug(f"Initiate repo {self.repo_path} on branch {self._current_branch}")
         else:
             self.repo = None
+            logger.debug(f"Initiate repo {self.repo_path} without Git")
 
         self.enc = tiktoken.get_encoding("cl100k_base")
 
+        self.file_context = {}
+
+        self.ignore_hidden = ignore_hidden
+        self.exclude_file_extensions = [".pem", ".csv"]
         self.exclude_dirs = [".gcoder", ".index"]
         if exclude_dirs:
             self.exclude_dirs.extend(exclude_dirs)
 
-    def file_tree(self, file_suffix: str = None) -> Folder:
-        return self._generate_file_tree(file_suffix=file_suffix)
+    def file_tree(self, directory: str = None, file_suffix: str = None) -> Folder:
+        return self._generate_file_tree(directory=directory, file_suffix=file_suffix)
 
-    def _generate_file_tree(self, file_suffix: str = None) -> Folder:
-        children = self.__generate_file_tree(tree=self.repo.tree(), file_suffix=file_suffix)
+    def _generate_file_tree(self, directory: str = None, file_suffix: str = None) -> Folder:
+        dir_parts = directory.split("/") if directory else []
+        children = self.__generate_file_tree(tree=self.repo.tree(), dir_parts=dir_parts, file_suffix=file_suffix)
 
         name = self.repo_path.name
         root_dir = Folder(
             name=name,
-            path="",
-            children=children)
+            path="")
+        root_dir.children = children  # FIXME: Get the wrong typing if set in constructor
 
         untracked_files = [item.a_path for item in self.repo.index.diff(None)]
         for path in self.repo.untracked_files + untracked_files:
-            self.add_file_to_tree(root_dir, path, False)
+            if directory is None or path.startswith(directory):
+                self.add_file_to_tree(root_dir, path, False)
 
         staged_files = [item.a_path for item in self.repo.index.diff("HEAD")]
         for path in staged_files:
-            self.add_file_to_tree(root_dir, path, True)
+            if directory is None or path.startswith(directory):
+                self.add_file_to_tree(root_dir, path, True)
 
         return root_dir
 
-    def __generate_file_tree(self, tree: Tree, file_suffix: str = None) -> list[File | Folder]:
+    def __generate_file_tree(self, tree: Tree, dir_parts: List[str] = None, file_suffix: str = None) -> list[Union[File, Folder]]:
         if tree is None:
             return []
 
         nodes = []
         for item in tree:
+            if item.name.startswith(".") and self.ignore_hidden:
+                continue
             if item.type == "blob":
+                if dir_parts:
+                    continue
                 full_path = os.path.join(self.repo_path, item.path)
                 if file_suffix and not item.path.endswith(file_suffix):
+                    continue
+                if any(item.path.endswith(ext) for ext in self.exclude_file_extensions):
                     continue
                 if not os.path.exists(full_path):
                     continue
                 if self._is_binary(full_path):
                     continue
-
-                language = language_by_filename(item.path)
-
-                content_type = get_purpose_by_filepath(language, item.path)
-
-                nodes.append(File(name=item.name, path=item.path, language=language, content_type=content_type))
+                nodes.append(self._build_file(file_path=item.path))
             elif item.type == "tree":
                 if item.name in self.exclude_dirs:
                     continue
+
+                if dir_parts and item.name != dir_parts[0]:
+                    continue
+
                 folder = Folder(
                     name=item.name,
-                    path=item.path,
-                    children=self.__generate_file_tree(tree=item))
+                    path=item.path)
+                folder.children = self.__generate_file_tree(tree=item, dir_parts=dir_parts[1:])  # FIXME: Get the wrong typing if set in constructor
                 nodes.append(folder)
         nodes.sort(key=lambda x: x.name)
         return nodes
 
     def _build_file(self, file_path: str, staged: bool = False) -> File:
+        language = language_by_filename(file_path)
+        if language:
+            purpose = get_purpose_by_filepath(language, file_path)
+            return File(
+                path=file_path,
+                staged=staged,
+                language=language,
+                purpose=purpose
+            )
         return File(path=file_path, staged=staged)
 
     def add_file_to_tree(self, root: Folder, path: str, staged: bool):
@@ -98,7 +131,6 @@ class FileRepository:
             return
         if self._is_binary(full_path):
             return
-        language = language_by_filename(path)
 
         p = Path(path)
         path_parts = p.parts
@@ -107,10 +139,11 @@ class FileRepository:
         for part in path_parts[:-1]:
             if part in self.exclude_dirs:
                 return
+            if part.startswith(".") and self.ignore_hidden:
+                return
 
             new_folder_path = str(Path(current_folder.path) / part)
             folder = current_folder.find(new_folder_path)
-
             if folder is None:
                 folder = Folder(name=part, path=new_folder_path, children=[])
                 current_folder.children.append(folder)
@@ -118,6 +151,7 @@ class FileRepository:
             current_folder = folder
 
         file_path = str(p)
+
         file = current_folder.find(file_path)
 
         if file is None:
@@ -125,12 +159,10 @@ class FileRepository:
             current_folder.children.append(file)
         else:
             file.staged = staged
-            file.untracked = not staged
 
     def _new_files(self, dir_path: str, files: list[str]) -> list[File]:
         return [
-            File(name=os.path.basename(file), path=os.path.join(dir_path, file), language=language_by_filename(file),
-                 untracked=True)
+            self._build_file(file_path=os.path.join(dir_path, file), staged=False)
             for file in files]
 
     def _is_binary(self, file_path: str):
@@ -138,8 +170,12 @@ class FileRepository:
             chunk = file.read(8192)
             return b'\0' in chunk
 
-    def as_retriever(self, top_k: int):
-        return self._index.as_retriever(similarity_top_k=top_k)
+    def listed_in_context(self, file_path: str):
+        self.file_context[file_path] = ContextScope.LISTED
+
+    def read_in_context(self, file_path: str):
+        self.file_context[file_path] = ContextScope.READ
+
 
     def get_files_by_suffix(self, file_suffixes: List[str]) -> list[str]:
         return [file.path

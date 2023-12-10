@@ -35,8 +35,8 @@ class WizardCoderLLMWrapper(LLMWrapper):
         llm_messages = ""
 
         for message in messages:
-            if message.sender == "Human":
+            if message.role == "Human":
                 llm_messages += "\n### Instruction:\n" + message.to_prompt()
-            elif message.sender == "AI":
+            elif message.role == "AI":
                 llm_messages += "\n### Response:\n" + message.to_prompt()
         return llm_messages

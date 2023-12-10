@@ -36,16 +36,16 @@ class DisplayCallback:
     def display_message(self, message: Message):
         if self.display_id:
             update_display("", display_id=self.display_id)
-        elif message.sender == "AI":
+        elif message.role == "AI":
             update_display(Markdown(message), display_id=self.display_id)
 
-        if message.sender == "Ghostcoder":
+        if message.role == "Ghostcoder":
             display(HTML(ghost_img))
-        elif message.sender == "Human":
+        elif message.role == "Human":
             display(HTML(human_img))
 
         for item in message.items:
-            if item.type == "file" and message.sender == "Human":
+            if item.type == "file" and message.role == "Human":
                 content = f"File: `{item.file_path}`"
                 display(Markdown(content))
             elif item.type.endswith("file"):

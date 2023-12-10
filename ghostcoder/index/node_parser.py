@@ -58,7 +58,7 @@ class CodeNodeParser(NodeParser):
                     parser = create_parser(language)
                 except Exception as e:
                     logging.warning(
-                        f"Could not get parser for language {language}. Will not parse document {node.id_}")
+                        f"Could not get parser for language {language}. Will not parse document {node.id_}. Error: {e}")
                     continue
 
                 content = node.get_content(metadata_mode=MetadataMode.NONE)

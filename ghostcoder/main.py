@@ -2,11 +2,11 @@ import logging
 from pathlib import Path
 from typing import List, Optional
 
-
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain.chat_models import ChatOpenAI
 from llama_index.vector_stores import ChromaVectorStore
 
+from ghostcoder.codeblocks.coderepository import CodeRepository
 from ghostcoder.write_code import CodeWriter
 from ghostcoder.actions.verify.code_verifier import CodeVerifier
 from ghostcoder.actions.write_code.prompt import FIX_TESTS_PROMPT
@@ -18,11 +18,12 @@ from ghostcoder.index.code_index import CodeIndex
 from ghostcoder.llm import LLMWrapper, ChatLLMWrapper
 from ghostcoder.schema import Message, UpdatedFileItem, TextItem, FileItem, FindFilesResponse, ReadFileResponse, \
     WriteCodeResponse, BaseResponse, ListFilesResponse, ListFilesRequest, WriteCodeRequest, CreateBranchRequest, \
-    ReadFileRequest, FindFilesRequest
+    ReadFileRequest, FindFilesRequest, File, ProjectInfoResponse, ProjectInfoRequest, Folder, DirectorySummary
 from ghostcoder.test_tools import TestTool
 from ghostcoder.utils import count_tokens
 
 logger = logging.getLogger(__name__)
+
 
 def create_openai_client(
         log_dir: Path,
@@ -76,12 +77,12 @@ class Ghostcoder:
 
         self.repository = repository or FileRepository(repo_path=Path(repo_dir), exclude_dirs=exclude_dirs)
 
-        log_dir = log_dir or repository.repo_path / ".prompt_log"
+        log_dir = log_dir or self.repository.repo_path / ".prompt_log"
         log_path = Path(log_dir)
-        #self.llm = llm or create_openai_client(log_dir=log_path, llm_name=model_name, temperature=0.01, streaming=True, max_tokens=2000, openai_api_key=openai_api_key)
-        #self.basic_llm = basic_llm or create_openai_client(log_dir=log_path, llm_name="gpt-3.5-turbo", temperature=0.0, streaming=True, openai_api_key=openai_api_key)
+        # self.llm = llm or create_openai_client(log_dir=log_path, llm_name=model_name, temperature=0.01, streaming=True, max_tokens=2000, openai_api_key=openai_api_key)
+        # self.basic_llm = basic_llm or create_openai_client(log_dir=log_path, llm_name="gpt-3.5-turbo", temperature=0.0, streaming=True, openai_api_key=openai_api_key)
 
-        self.index_dir = index_dir or str(repository.repo_path / ".index")
+        self.index_dir = index_dir or str(self.repository.repo_path / ".index")
 
         import chromadb
         db = chromadb.PersistentClient(path=self.index_dir + "/.chroma_db")
@@ -89,9 +90,13 @@ class Ghostcoder:
         vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
 
         try:
-            self.code_index = code_index or CodeIndex(repository=self.repository, index_dir=self.index_dir, vector_store=vector_store, limit=search_limit)
+            self.code_index = code_index or CodeIndex(repository=self.repository, index_dir=self.index_dir,
+                                                      vector_store=vector_store, limit=search_limit)
         except Exception as e:
             logger.warning(f"Failed to create code index: {e}")
+            # print stack trace
+            import traceback
+            traceback.print_exc()
             self.code_index = None
 
         self.code_writer = CodeWriter()
@@ -105,7 +110,8 @@ class Ghostcoder:
         self.updated_files = []
 
         if verify_code:
-            self.verifier = CodeVerifier(repository=self.repository, test_tool=test_tool, language=language, callback=callback)
+            self.verifier = CodeVerifier(repository=self.repository, test_tool=test_tool, language=language,
+                                         callback=callback)
         else:
             self.verifier = None
 
@@ -167,7 +173,7 @@ You have access to the following abilities you can call:
 
         debug_text_before = f"> _Provided files from file context:_"
         for i, file_item in enumerate(self.file_context):
-             debug_text_before += f"\n> {i + 1}. `{file_item.file_path}`"
+            debug_text_before += f"\n> {i + 1}. `{file_item.file_path}`"
 
         debug_text_before += "\n\n"
 
@@ -201,7 +207,8 @@ You have access to the following abilities you can call:
 
         logger.info(f"Updated code diff:\n{updated_file.diff}")
 
-        updated_file_item = next((item for item in self.updated_files if item.file_path == updated_file.file_path), None)
+        updated_file_item = next((item for item in self.updated_files if item.file_path == updated_file.file_path),
+                                 None)
         if not updated_file_item:
             self.updated_files.append(updated_file)
         else:
@@ -228,15 +235,16 @@ You have access to the following abilities you can call:
         files = []
         for file in self.repository.file_tree().traverse():
             file_contents = self.repository.get_file_content(file.path)
-            logger.info(f"Found for content {file.path}")
 
             if file_contents:
+                logger.info(f"Found for content {file.path}")
+
                 try:
                     parser = create_parser(file.language)
                     code_block = parser.parse(file_contents)
-                    trimmed_block = code_block.trim_with_types(include_types=[CodeBlockType.FUNCTION, CodeBlockType.CLASS])
+                    trimmed_block = code_block.trim_with_types(
+                        include_types=[CodeBlockType.FUNCTION, CodeBlockType.CLASS])
                     file_contents = str(trimmed_block)
-                    logger.info(f"Trimmed content {file_contents}")
                 except Exception as e:
                     logger.info(f"Failed to parse file {file.path}: {e}")
                     file_contents = None
@@ -245,32 +253,130 @@ You have access to the following abilities you can call:
 
         return ListFilesResponse(files=files)
 
-    def find_files(self, request: FindFilesRequest) -> FindFilesResponse:
-        if self.code_index:
-            hits = self.code_index.search(request.description, limit=40)
+    def get_project_info(self, request: ProjectInfoRequest) -> ProjectInfoResponse:
+        repo_name = self.repository.repo_path.name
+        file_tree_summary = self._create_directory_summary(self.repository.file_tree())
 
-            files = []
-            debug_text_before = (f"> _Query: : {request.description}_\n"
-                                 f"> _Vector store search hits : {len(hits)}_")
-            for i, hit in enumerate(hits):
-                if self.debug_mode:
-                    debug_text_before += f"\n> {i + 1}. `{hit.path}` ({len(hit.blocks)} blocks "
-                    debug_text_before += ", ".join([f"`{block.identifier}`" for block in hit.blocks])
-                    debug_text_before += ")"
+        relevant_files = []
+        readme = self.repository.get_file_content("README.md")
+        if readme:
+            relevant_files.append(FileItem(file_path="README.md", content=readme[0:1000]))
 
-                if any([hit.path in item.file_path for item in files]):
+        response = ProjectInfoResponse(
+            repository=repo_name,
+            file_tree=file_tree_summary,
+            relevant_files=relevant_files)
+
+        logger.debug(f"Project info: {response}")
+
+        return response
+
+    def _create_directory_summary(self, folder: Folder):
+        first_files_in_directory = [file.path for file in folder.children[:3] if isinstance(file, File)]
+
+        children = []
+        number_of_files_by_extension = {}
+        for file in folder.children:
+            if isinstance(file, File):
+                if "." not in file.path:
                     continue
+                file_extension = file.path.split(".")[-1]
+                number_of_files_by_extension[file_extension] = number_of_files_by_extension.get(file_extension, 0) + 1
+            elif isinstance(file, Folder):
+                directory_summary = self._create_directory_summary(file)
+                children.append(directory_summary)
 
-                content = self.repository.get_file_content(file_path=hit.path)
-                files.append(FileItem(file_path=hit.path, content=content))
+        return DirectorySummary(
+            name=folder.name,
+            first_files_in_directory=first_files_in_directory,
+            files_by_file_type=number_of_files_by_extension,
+            children=children
+        )
 
-            logging.debug(debug_text_before)
+    def find_files(self, request: FindFilesRequest) -> FindFilesResponse:
+        logger.info(f"find_files: {request}")
 
+        file_tree = self.repository.file_tree(directory=request.directory, file_suffix=request.file_extension)
+        files = file_tree.traverse()
 
+        if not files:
+            logger.info(f"No files found.")
+            return FindFilesResponse(files=[])
 
-        self.file_context = files
+        if request.purpose != "any":
+            files = [file for file in files if file.purpose == request.purpose]
 
-        return FindFilesResponse(files=files)
+        if request.language in ["javascript", "python", "java", "typescript"]:
+            files = [file for file in files if file.language == request.language]
+
+        if not files:
+            logger.info(f"No files found with purpose {request.purpose} and language {request.language}.")
+            return FindFilesResponse(files=[])
+
+        if len(files) > 25:
+            if self.code_index:
+                logger.debug(f"Found {len(files)} files. Will search for relevant files.")
+
+                filter_values = {}
+                if request.language:
+                    filter_values["language"] = request.language
+                if request.purpose != "any":
+                    filter_values["purpose"] = request.purpose
+                if request.file_extension:
+                    filter_values["file_extension"] = request.file_extension
+
+                hits = self.code_index.search(request.description, filter_values=filter_values, limit=25)
+
+                if not hits:
+                    logger.debug(f"No hits found. Will return all {len(files)} files.")
+                    return FindFilesResponse(files=[FileItem(file_path=file.path) for file in files])
+
+                files = []
+                debug_text_before = (f"> _Query: : {request.description}_\n"
+                                     f"> _Vector store search hits : {len(hits)}_")
+                for i, hit in enumerate(hits):
+                    if self.debug_mode:
+                        debug_text_before += f"\n> {i + 1}. `{hit.path}` ({len(hit.blocks)} blocks "
+                        debug_text_before += ", ".join([f"`{block.identifier}`" for block in hit.blocks])
+                        debug_text_before += ")"
+
+                    if any([hit.path in item.path for item in files]):
+                        continue
+
+                    # TODO: Add matching blocks to content = self.repository.get_file_content(file_path=hit.path)
+                    files.append(File(path=hit.path))
+
+                logging.debug(debug_text_before)
+
+                # TODO: Add other similar files
+            else:
+                logger.debug(f"Found {len(files)} files. Will return all with no content.")
+                return FindFilesResponse(files=[FileItem(file_path=file.path) for file in files])
+
+        file_items = []
+        for file in files:
+            file_contents = self.repository.get_file_content(file.path)
+
+            if not file_contents:
+                logger.info(f"Failed to read file {file.path}")
+                continue
+
+            logger.info(f"Found file: {file.path}")
+            if file.language:
+                try:
+                    parser = create_parser(file.language)
+                    code_block = parser.parse(file_contents)
+                    trimmed_block = code_block.trim_with_types(
+                        include_types=[CodeBlockType.FUNCTION, CodeBlockType.CLASS])
+                    file_contents = str(trimmed_block)
+                except Exception as e:
+                    logger.info(f"Failed to parse file {file.path}: {e}")
+            else:
+                file_contents = file_contents[:500] + " ..."
+
+            file_items.append(FileItem(file_path=file.path, content=file_contents))
+
+        return FindFilesResponse(files=file_items)
 
     def read_file(self, request: ReadFileRequest) -> ReadFileResponse:
         contents = self.repository.get_file_content(file_path=request.file_path)
@@ -290,7 +396,7 @@ You have access to the following abilities you can call:
         debug_text_before = f"> _Vector store search hits : {len(hits)}_"
         for i, hit in enumerate(hits):
             if self.debug_mode:
-                debug_text_before += f"\n> {i+1}. `{hit.path}` ({len(hit.blocks)} blocks "
+                debug_text_before += f"\n> {i + 1}. `{hit.path}` ({len(hit.blocks)} blocks "
                 debug_text_before += ", ".join([f"`{block.identifier}`" for block in hit.blocks])
                 debug_text_before += ")"
 
@@ -327,9 +433,12 @@ When you return code you should use the following format:
 
         file_context_message = Message(sender="User", items=self.file_context)
 
-        file_tree_message = Message(sender="User", items=[TextItem(text="Existing files:\n" + self.repository.file_tree().tree_string(content_type="code"))])
+        file_tree_message = Message(sender="User", items=[
+            TextItem(text="Existing files:\n" + self.repository.file_tree().tree_string(content_type="code"))])
 
-        response, _ = self.llm.generate(system_prompt, messages=[file_context_message, file_tree_message] + self.message_history, callback=callback)
+        response, _ = self.llm.generate(system_prompt,
+                                        messages=[file_context_message, file_tree_message] + self.message_history,
+                                        callback=callback)
 
         debug_text_after = f"\n\n> _Filtered context files:_"
 
@@ -354,7 +463,7 @@ When you return code you should use the following format:
                 debug_text_after = f"\n>\n> _Files mentioned in message:_"
 
             new_file_count += 1
-            debug_text_after += f"\n> {new_file_count}. `{found_file.path }`"
+            debug_text_after += f"\n> {new_file_count}. `{found_file.path}`"
             content = self.repository.get_file_content(file_path=found_file.path)
 
             self.file_context.append(FileItem(file_path=found_file.path, content=content))
@@ -454,7 +563,8 @@ When you return code you should use the following format:
                 retry += 1
                 incoming_messages = self.make_summary(messages)
 
-                logger.info(f"{len(failures)} verifications failed (last run {last_run}, retrying ({retry}/{self.max_retries})...")
+                logger.info(
+                    f"{len(failures)} verifications failed (last run {last_run}, retrying ({retry}/{self.max_retries})...")
                 incoming_messages.append(verification_message)
                 response_messages = self.test_fix_writer.execute(incoming_messages=incoming_messages)
                 return self.verify(messages=messages + [verification_message] + response_messages,
@@ -470,15 +580,15 @@ When you return code you should use the following format:
         sys_prompt = """Make a short summary of the provided message."""
 
         for message in messages:
-            if message.sender == "Human":
+            if message.role == "Human":
                 text_items = message.find_items_by_type("text")
-                summarized_messages.append(Message(sender=message.sender, items=text_items))
+                summarized_messages.append(Message(sender=message.role, items=text_items))
             else:
                 if not message.summary and self.basic_llm:
                     message.summary, stats = self.basic_llm.generate(sys_prompt, messages=[message])
                     logger.debug(f"Created summary {stats.json}")
                 if message.summary:
-                    summarized_messages.append(Message(sender=message.sender, items=[TextItem(text=message.summary)]))
+                    summarized_messages.append(Message(sender=message.role, items=[TextItem(text=message.summary)]))
 
         return summarized_messages
 
@@ -507,6 +617,27 @@ When you return code you should use the following format:
             return BaseResponse(success=False, error=f"Failed to discard changes for {file_paths}: {e}")
 
         return BaseResponse(success=True)
+
+
+    def get_definitions(self) -> List[dict]:
+
+        definitions = []
+        definitions.append(self._create_function_definition("get_project_info", "Get project info", ProjectInfoRequest.schema()["properties"]))
+        definitions.append(self._create_function_definition("find_files", "Find files", FindFilesRequest.schema()["properties"]))
+        definitions.append(self._create_function_definition("read_file", "Read file", ReadFileRequest.schema()["properties"]))
+
+        return None
+
+    def _create_function_definition(self, name: str, description: str, properties: dict) -> dict:
+        return {
+            "type": "function",
+            "function": {
+                "name": name,
+                "description": description,
+                "parameters": properties,
+            },
+        }
+
 
     def get_file_context(self):
         files = [file.file_path for file in self.file_context]

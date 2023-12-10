@@ -6,6 +6,7 @@ from llama_index import ServiceContext, StorageContext, load_index_from_storage,
      get_response_synthesizer
 from llama_index.query_engine import RetrieverQueryEngine
 from llama_index.response_synthesizers import ResponseMode
+from llama_index.vector_stores import ChromaVectorStore
 from llama_index.vector_stores.types import VectorStore, ExactMatchFilter, MetadataFilters
 from pydantic import BaseModel, Field
 
@@ -27,23 +28,36 @@ class FileSearchHit(BaseModel):
     blocks: List[BlockSearchHit] = Field(description="The blocks of the file.")
 
 
+def create_default_vector_store(index_dir: str):
+    import chromadb
+    from chromadb.config import Settings
+
+    db = chromadb.PersistentClient(path=index_dir + "/.chroma_db", settings=Settings(anonymized_telemetry=False))
+    chroma_collection = db.get_or_create_collection("code-index")
+    return ChromaVectorStore(chroma_collection=chroma_collection)
+
+
 class CodeIndex:
 
     def __init__(self,
                  repository: FileRepository,
-                 index_dir: str,
+                 index_dir: str = None,
                  reload: bool = False,
                  limit: int = 5,
                  vector_store: Optional[VectorStore] = None):
         self.repository = repository
-        self.vector_store = vector_store
-        self.index_dir = index_dir
+
+        self.index_dir = index_dir or str(self.repository.repo_path / ".index")
+
         self.limit = limit
+
+        self.vector_store = vector_store or create_default_vector_store(self.index_dir)
 
         node_parser = CodeNodeParser.from_defaults(include_metadata=False)
         self.service_context = ServiceContext.from_defaults(node_parser=node_parser)
 
         docs = self._get_documents()
+        logging.info(f"Found {len(docs)} documents.")
 
         if reload:
             self.initiate_index(docs)
@@ -96,7 +110,7 @@ class CodeIndex:
 
             file_extension = file.path.split(".")[-1]
 
-            if file.type == "code":
+            if file.language:
                 metadata = {
                     "path": file.path,
                     "file_extension": file_extension,
@@ -117,7 +131,7 @@ class CodeIndex:
             documents.append(doc)
         return documents
 
-    def search(self, query: str, filter_values: dict = None, limit: int = None):
+    def search(self, query: str, filter_values: dict = {}, limit: int = None):
         filters = []
         for key, value in filter_values.items():
             filters.append(ExactMatchFilter(key=key, value=value))

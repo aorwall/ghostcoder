@@ -29,5 +29,5 @@ class LLMWrapper:
     def messages_to_prompt(self, messages: List[Message], few_shot_example: bool = False):
         llm_messages = ""
         for message in messages:
-            llm_messages += "\n" + message.sender + ": " + message.to_prompt()
+            llm_messages += "\n" + message.role + ": " + message.to_prompt()
         return llm_messages

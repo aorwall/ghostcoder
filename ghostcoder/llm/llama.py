@@ -37,9 +37,9 @@ class LlamaLLMWrapper(LLMWrapper):
             llm_messages = "[INST]"
 
         for message in messages:
-            if message.sender == "Human":
+            if message.role == "Human":
                 llm_messages += str(message)
-            elif message.sender == "AI":
+            elif message.role == "AI":
                 llm_messages += "[/INST] " + str(message)
                 if not few_shot_example:
                     llm_messages += "</s>\n<s>[INST]"

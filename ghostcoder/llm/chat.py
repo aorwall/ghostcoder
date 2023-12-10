@@ -23,7 +23,7 @@ class ChatLLMWrapper(LLMWrapper):
         llm_messages = [SystemMessage(content=sys_prompt)]
 
         for message in messages:
-            if message.sender == "AI":
+            if message.role == "AI":
                 llm_messages.append(AIMessage(content=message.to_prompt()))
             else:
                 llm_messages.append(HumanMessage(content=message.to_prompt()))

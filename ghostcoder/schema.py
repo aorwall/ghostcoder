@@ -1,6 +1,6 @@
 import logging
 from enum import Enum
-from typing import List, Union, Optional, Dict, Any
+from typing import List, Union, Optional, Dict, Any, Type
 
 from langchain.callbacks.openai_info import get_openai_token_cost_for_model, MODEL_COST_PER_1K_TOKENS
 from marshmallow import ValidationError
@@ -172,15 +172,15 @@ class UpdatedFileItem(FileItem):
 
 class FunctionItem(Item):
     type: str = "function"
-    function: str = Field(description="name of the function")
+    name: str = Field(description="name of the function")
     arguments: dict = Field(default=None, description="arguments")
     output: dict = Field(default=None, description="output")
 
     def __str__(self) -> str:
-        return self.function  # TODO
+        return self.name  # TODO
 
     def to_prompt(self, style: Optional[str] = None) -> str:
-        return self.function  # TODO
+        return self.name  # TODO
 
 
 class ItemHolder(BaseModel):
@@ -282,7 +282,7 @@ class Stats(BaseModel):
 
 
 class Message(ItemHolder):
-    sender: str = Field(description="who sent the message", enum=["Human", "AI", "Agent"])
+    role: str = Field(description="Who sent the message", enum=["user", "assistant", "agent"])
     items: List[Item] = []
     summary: Optional[str] = Field(default=None, description="summary of the message")
     stats: Optional[Stats] = Field(default=None, description="status information about the processing of the message")
@@ -299,6 +299,15 @@ class Message(ItemHolder):
 
     def find_items_by_type(self, item_type: str):
         return [item for item in self.items if item.type == item_type]
+
+    def dict(self):
+        return {
+            "role": self.role,
+            "message": self.to_prompt(),
+        }
+
+
+
 
     def __str__(self) -> str:
         return "\n".join([item.to_prompt() for item in self.items])
@@ -327,33 +336,39 @@ class MergeResponse(BaseModel):
 
 class File(BaseModel):
     type: str = "file"
+    name: str = ""  # TODO: Remove?
     path: str
     last_modified: float = 0
     staged: bool = False
+    language: str = Field(default=None, description="Programming language")
+    purpose: Optional[str] = Field(default=None, description="Purpose of the file", enum=["test", "code", "any"])
 
 
 class Folder(BaseModel):
-    name: str
+    type: str = "folder"
+    name: str = ""  # TODO: Remove?
     path: str
-    children: List[Union[File, "Folder"]]
+    children: List[Union[File, "Folder"]] = []
 
     def traverse(self) -> list[File]:
         files = []
+
         for node in self.children:
-            if isinstance(node, File):
-                files.append(node)
-            elif isinstance(node, Folder):
+            if node.type == "folder":
                 files.extend(node.traverse())
+            else:
+                files.append(node)
         return files
 
     def find(self, path):
         for child in self.children:
             if child.path == path:
                 return child
-            elif isinstance(child, Folder):
+            if child.type == "folder":
                 result = child.find(path)
                 if result is not None:
                     return result
+
         return None
        
     def tree_string(self, content_type: Optional[str] = None, indent=0):
@@ -363,7 +378,7 @@ class Folder(BaseModel):
                 name = "/" + child.name
             else:
                 name = child.name
-            if isinstance(child, Folder):
+            if child.type == "folder":
                 file_tree += " " * indent + name + "/\n"
 
                 sub_tree = child.tree_string(content_type=content_type, indent=indent + 2)
@@ -374,11 +389,11 @@ class Folder(BaseModel):
         return file_tree
 
 
-class CodeFile(File):
-    type: str = "code"
-    blocks: List[CodeBlock] = Field(default=[], description="Code blocks in the file")
-    language: str = Field(default=None, description="Programming language")
-    purpose: Optional[str] = Field(default=None, description="Purpose of the file", enum=["test", "code", "any"])
+#class CodeFile(File):
+#    type: str = "code"
+#    #blocks: List[CodeBlock] = Field(default=[], description="Code blocks in the file")
+#    language: str = Field(default=None, description="Programming language")
+#    purpose: Optional[str] = Field(default=None, description="Purpose of the file", enum=["test", "code", "any"])
 
 
 class SaveFilesRequest(BaseModel):
@@ -398,43 +413,6 @@ class Difficulty(Enum):
     MEDIUM = "medium"
     HARD = "hard"
 
-class BaseResponse(BaseModel):
-    success: bool = True
-    error: Optional[str] = None
-
-class FindFilesRequest(BaseModel):
-    description: Optional[str] = Field(default=None, description="Detailed description of the files to find")
-    language: Optional[str] = Field(default=None, description="Programming language of the files to find")
-    directory: Optional[str] = Field(default=None, description="Path to the directory to find files in.")
-    names: List[str] = Field(default=None, description="List of file names to find")
-    purpose: Optional[str] = Field(default="any", description="Purpose of the files to find", enum=["test", "code", "any"])
-
-class FindFilesResponse(BaseResponse):
-    files: List[FileItem]
-
-class ListFilesRequest(BaseModel):
-    directory: str = Field(default=None, description="Path to the directory to find files in.")
-
-class ListFilesResponse(BaseResponse):
-    files: List[FileItem] = Field(default=[], description="List of files in the repository")
-
-class ReadFileRequest(BaseModel):
-    file_path: str = Field(description="Path to the file to read")
-
-class ReadFileResponse(BaseResponse):
-    file_path: str
-    contents: Optional[str] = None
-
-class WriteCodeRequest(BaseModel):
-    file_path: str = Field(description="Path to the file to write")
-    contents: str = Field(description="Contents of the file")
-    new_file: bool = Field(default=False, description="If the file is new and doesn't exist in the repository")
-
-class WriteCodeResponse(BaseResponse):
-    file_path: str = Field(description="Path to the file to write")
-    git_diff: str = Field(default=None, description="Diff of the file")
-    content_after_update: str = Field(default=None, description="Contents of the file after update")
-    branch_name: str = Field(default=None, description="Name of the branch")
 
 class CreateBranchRequest(BaseModel):
     branch_name: str = Field(description="Name of the branch")

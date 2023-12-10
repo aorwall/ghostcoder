@@ -6,7 +6,7 @@ from git import Repo
 
 from ghostcoder import FileRepository
 from ghostcoder.codeblocks import create_parser, CodeBlockType
-from ghostcoder.schema import CodeFile, File
+from ghostcoder.schema import File
 from ghostcoder.utils import language_by_filename, get_purpose_by_filepath
 
 logger = logging.getLogger(__name__)
@@ -24,22 +24,22 @@ class CodeRepository(FileRepository):
         language = language_by_filename(file_path)
         if language:
             purpose = get_purpose_by_filepath(language, file_path)
-            parser = self._get_parser(language)
+            parser = None  # FIXME self._get_parser(language)
             code_blocks = []
             if parser:
                 contents = self.get_file_content(file_path)
                 if contents:
                     code_block = parser.parse(file_path)
                     if code_block and code_block.type == CodeBlockType.MODULE:
-                        code_blocks = code_block.code_blocks
+                        code_blocks = code_block.children
                     elif code_block:
                         code_blocks = [code_block]
-            return CodeFile(
+            return File(
                 path=file_path,
                 staged=staged,
                 language=language,
                 purpose=purpose,
-                code_blocks=code_blocks
+                #code_blocks=code_blocks,
             )
         else:
             return super()._build_file(file_path, staged)

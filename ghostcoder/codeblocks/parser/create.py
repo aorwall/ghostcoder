@@ -8,9 +8,9 @@ from ghostcoder.codeblocks.parser.typescript import TypeScriptParser
 
 
 def create_parser(language: str, **kwargs) -> Optional[CodeParser]:
-    #if language == "java":
-    #    return JavaParser(**kwargs)
-    if language == "python":
+    if language == "java":
+        return JavaParser(**kwargs)
+    elif language == "python":
         return PythonParser(**kwargs)
     elif language == "typescript":
         return TypeScriptParser("tsx", **kwargs)

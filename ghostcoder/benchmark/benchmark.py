@@ -202,8 +202,8 @@ Only use standard python libraries, don't suggest installing any packages.""")
                             callback=self.callback,
                             auto_mode=True)
 
-        human_message = next(([m] for m in messages if m.sender == "Human"), [])
-        ai_message = next(([m] for m in reversed(messages) if m.sender == "AI"), [])
+        human_message = next(([m] for m in messages if m.role == "Human"), [])
+        ai_message = next(([m] for m in reversed(messages) if m.role == "AI"), [])
 
         response_messages = action.execute(human_message + ai_message + [message])
         response_message = response_messages[-1]

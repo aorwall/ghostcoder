@@ -39,9 +39,9 @@ class DisplayCallbackOne(DisplayCallback):
     def render(self, messages: List[Message]):
         content = ""
         for message in messages:
-            if message.sender == "AI":
+            if message.role == "AI":
                 content += "\n" + ai_md + " :"
-            elif message.sender == "Human":
+            elif message.role == "Human":
                 content += "\n" + human_md + ":"
             else:
                 content += "\n" + ghost_md + ":"

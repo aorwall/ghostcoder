@@ -131,6 +131,8 @@ class CodeParser:
             return CodeBlockType.FUNCTION
         elif tag == "definition.statement":
             return CodeBlockType.STATEMENT
+        elif tag == "definition.constructor":
+            return CodeBlockType.CONSTRUCTOR
         elif tag == "definition.block":
             return CodeBlockType.BLOCK
         elif tag == "definition.module":
