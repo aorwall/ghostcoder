@@ -15,8 +15,9 @@ class BaseResponse(BaseModel):
 
 def function(name: str,
              description: str,
-             request_model: Type[BaseModel],
              response_model: Type[BaseModel],
+             request_model: Type[BaseModel] = None,
+             method: str = "post",
              is_consequential: bool = False):
     def decorator(func: Callable):
         def wrapper(*args, **kwargs):
@@ -26,6 +27,7 @@ def function(name: str,
         wrapper.function_metadata = {
             "name": name,
             "description": description,
+            "method": method,
             "request_model": request_model,
             "response_model": response_model,
             "is_consequential": is_consequential
@@ -61,14 +63,53 @@ class Tool:
                 metadata = getattr(func, "function_metadata")
                 self._function_by_name[metadata["name"]] = func
 
-                # TODO: Handle different schema_formats
-                schema = {
-                    "type": "function",
-                    "function": {
-                        "name": metadata["name"],
-                        "description": metadata["description"],
-                        "parameters": metadata["request_model"].schema(),
+                if schema_format == "api":
+
+                    if metadata["request_model"] is not None:
+                        request_body = {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": metadata["request_model"].schema()["properties"]
+                                    }
+                                }
+                            },
+                            "required": True
+                        }
+                    else:
+                        request_body = None
+
+                    schema = {
+                        f"/api/{metadata['name']}": {
+                            metadata['method']: {
+                                "summary": metadata['description'],
+                                "operationId": metadata["name"],
+                                "x-openai-isConsequential": metadata['is_consequential'],
+                                request_body and "requestBody": request_body,
+                                "responses": {
+                                    "200": {
+                                        "description": "Successful Response",
+                                        "content": {
+                                            "application/json": {
+                                                "schema": {
+                                                    "type": "object"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
+                else:
+                    schema = {
+                        "type": "function",
+                        "function": {
+                            "name": metadata["name"],
+                            "description": metadata["description"],
+                            "parameters": metadata["request_model"].schema(),
+                        }
                 }
                 self._function_schemas.append(schema)
 
@@ -88,6 +129,10 @@ class Tool:
     @property
     def schema(self) -> List[Dict[str, Any]]:
         return self._function_schemas
+
+    def schema_as_yaml(self) -> str:
+        import yaml
+        return yaml.dump(self.schema)
 
     def _parse_request_obj(self, func, arguments: dict):
         metadata = getattr(func, "function_metadata")
