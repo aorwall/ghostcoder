@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ghostcoder"
-version = "0.0.13"
+version = "0.0.14"
 description = ""
 authors = ["Albert Örwall <albert@a20g.se>"]
 readme = "README.md"
