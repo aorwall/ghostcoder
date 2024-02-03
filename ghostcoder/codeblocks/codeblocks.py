@@ -1,42 +1,99 @@
 import copy
 import logging
 import re
-from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Optional, Callable, Tuple
 
+from pydantic import BaseModel, validator, Field, root_validator
+
 from ghostcoder import utils
 from ghostcoder.codeblocks.parser.comment import get_comment_symbol
+from ghostcoder.utils import count_tokens, Colors
 
 
 class CodeBlockType(str, Enum):
-    DECLARATION = "declaration"
-    IDENTIFIER = "identifier"
-    PARAMETER = "parameter"
+    DECLARATION = "Declaration"
+    IDENTIFIER = "Identifier"
+    PARAMETER = "Parameter"
 
-    MODULE = "module"
+    MODULE = "Module"
+    CLASS = "Class"
+    FUNCTION = "Function"
+    CONSTRUCTOR = "Constructor"
+
+    TEST_SUITE = "TestSuite"
+    TEST_CASE = "TestCase"
+
+    IMPORT = "Import"
+    STATEMENT = "Statement"
+    BLOCK = "Block"
+    ASSIGNMENT = "Assignment"
+    CALL = "Call"
+    CODE = "Code"
+    BLOCK_DELIMITER = "BlockDelimiter"
+
+    COMMENT = "Comment"
+    COMMENTED_OUT_CODE = "CommentedOutCode"
+
+    SPACE = "Space"
+    ERROR = "Error"
+
+    @classmethod
+    def from_string(cls, tag: str) -> Optional['CodeBlockType']:
+        if not tag.startswith("definition"):
+            return None
+
+        tag_to_block_type = {
+            "definition.assignment": cls.ASSIGNMENT,
+            "definition.block": cls.BLOCK,
+            "definition.block_delimiter": cls.BLOCK_DELIMITER,
+            "definition.call": cls.CALL,
+            "definition.class": cls.CLASS,
+            "definition.code": cls.CODE,
+            "definition.comment": cls.COMMENT,
+            "definition.constructor": cls.CONSTRUCTOR,
+            "definition.error": cls.ERROR,
+            "definition.function": cls.FUNCTION,
+            "definition.import": cls.IMPORT,
+            "definition.module": cls.MODULE,
+            "definition.statement": cls.STATEMENT,
+            "definition.test_suite": cls.TEST_SUITE,
+            "definition.test_case": cls.TEST_CASE,
+        }
+        return tag_to_block_type.get(tag)
+
+NON_CODE_BLOCKS = [
+    CodeBlockType.BLOCK_DELIMITER,
+    CodeBlockType.COMMENT,
+    CodeBlockType.COMMENTED_OUT_CODE,
+    CodeBlockType.IMPORT,
+    CodeBlockType.ERROR,
+    CodeBlockType.SPACE
+]
+
+class ReferenceScope(str, Enum):
+    EXTERNAL = "external"
+    DEPENDENCY = "dependency"  # External dependency
+    FILE = "file"  # File in repository
+    PROJECT = "project"
     CLASS = "class"
-    FUNCTION = "function"
-    CONSTRUCTOR = "constructor"
-
-    TEST_SUITE = "test_suite"
-    TEST_CASE = "test_case"
-
-    IMPORT = "import"
-    STATEMENT = "statement"
-    BLOCK = "block"
-    CODE = "code"
-    BLOCK_DELIMITER = "block_delimiter"
-
-    COMMENT = "comment"
-    COMMENTED_OUT_CODE = "commented_out_code"
-
-    SPACE = "space"
-    ERROR = "error"
+    LOCAL = "local"
+    GLOBAL = "global"
 
 
-@dataclass
-class MergeAction:
+class RelationshipType(str, Enum):
+    UTILIZES = "utilizes"
+    USES = "uses"
+    DEFINED_BY = "defined_by"
+    IS_A = "is_a"
+    PROVIDES = "provides"
+    IMPORTS = "imports"
+    CALLS = "calls"
+    DEPENDENCY = "dependency"
+    TYPE = "type"
+
+
+class MergeAction(BaseModel):
     action: str
     original_block: Optional["CodeBlock"] = None
     updated_block: Optional["CodeBlock"] = None
@@ -47,30 +104,91 @@ class MergeAction:
         return f"{self.action}: {original_id or '[]'} -> {updated_id or '[]'}"
 
 
-NON_CODE_BLOCKS = [CodeBlockType.BLOCK_DELIMITER, CodeBlockType.COMMENTED_OUT_CODE, CodeBlockType.SPACE, CodeBlockType.BLOCK_DELIMITER]
+class Relationship(BaseModel):
+    scope: ReferenceScope = Field(description="The scope of the reference.")
+    identifier: Optional[str] = Field(default=None, description="ID")
+    type: RelationshipType = Field(default=RelationshipType.USES, description="The type of the reference.")
+    external_path: List[str] = Field(default=[], description="The path to the referenced parent code block.")
+    resolved_path: List[str] = Field(default=[], description="The path to the file with the referenced code block.")
+    path: List[str] = Field(default=[], description="The path to the referenced code block.")
+
+    @root_validator(pre=True)
+    def validate_path(cls, values):
+        external_path = values.get("external_path")
+        path = values.get("path")
+        if not external_path and not path:
+            raise ValueError("Cannot create Reference without external_path or path.")
+        return values
+
+    def __hash__(self):
+        return hash((self.scope, tuple(self.path)))
+
+    def __eq__(self, other):
+        return (self.scope, self.path) == (other.scope, other.path)
+
+    def full_path(self):
+        return self.external_path + self.path
+
+    def __str__(self):
+        if self.identifier:
+            start_node = self.identifier
+        else:
+            start_node = ""
+
+        end_node = ""
+        if self.external_path:
+            end_node = "/".join(self.external_path)
+        if self.path:
+            if self.external_path:
+                end_node += "/"
+            end_node += ".".join(self.path)
+
+        return f"({start_node})-[:{self.type.name} {{scope: {self.scope.value}}}]->({end_node})"
 
 
-@dataclass
-class CodeBlock:
+class Parameter(BaseModel):
+    identifier: str = Field(description="The identifier of the parameter.")
+    type: Optional[str] = Field(description="The type of the parameter.")
+
+
+class Visibility(str, Enum):
+    EVERYTHING = "everything"  # Show all blocks
+    CODE = "code"  # Only show code but comment out function and class definitions
+    NOTHING = "nothing"  # Comment out everything
+
+
+class ShowBlock(BaseModel):
+    visibility: Visibility = Field(default=Visibility.EVERYTHING, description="The visibility of the block.")
+    tree: dict[str, "ShowBlock"] = Field(default={}, description="Child blocks")
+
+
+class CodeBlock(BaseModel):
     content: str
     type: CodeBlockType
-    identifier: Optional[str] = None,
-    content_lines: List[str] = field(default_factory=list)
+    file_path: str = None  # TODO: Move to Module sub class
+    identifier: Optional[str] = None
+    parameters: List[Parameter] = []  # TODO: Move to Function sub class
+    references: List[Relationship] = []
+    content_lines: List[str] = []
     start_line: int = 0
     end_line: int = 0
-    tree_sitter_type: Optional[str] = None
+    properties: dict = {}
     pre_code: str = ""
     pre_lines: int = 0
     indentation: str = ""
-    language:  Optional[str] = None
-    tags: List[str] = field(default_factory=list)
+    language: Optional[str] = None
+    merge_history: List[MergeAction] = []
+    children: List["CodeBlock"] = []
+    parent: Optional["CodeBlock"] = None
 
-    merge_history: List[MergeAction] = field(default_factory=list)
+    @validator('type', pre=True, always=True)
+    def validate_type(cls, v):
+        if v is None:
+            raise ValueError("Cannot create CodeBlock without type.")
+        return v
 
-    children: List["CodeBlock"] = field(default_factory=list)
-    parent: Optional["CodeBlock"] = field(default=None)
-
-    def __post_init__(self):
+    def __init__(self, **data):
+        super().__init__(**data)
         for child in self.children:
             child.parent = self
 
@@ -129,74 +247,213 @@ class CodeBlock:
     def __str__(self):
         return self.to_string()
 
-    def length_without_whitespace(self):
-        string_without_whitespace = re.sub(r'\s', '', self.to_string())
-        return len(string_without_whitespace)
+    def to_string(self):
+        return self._to_context_string()
 
-    def to_string(self, include_types: List[CodeBlockType] = None):
-        child_code = ""
-        if include_types:
-            for child in self.children:
-                if child.type in include_types:
-                    child_code += child.to_string(include_types)
-                else:
-                    child_code += self.create_commented_out_block().to_string()
+    def _insert_into_tree(self, node, path):
+        if not path:
+            return
+        if path[0] not in node:
+            node[path[0]] = {}
+        self._insert_into_tree(node[path[0]], path[1:])
+
+    def _replace_in_tree(self, node, path):
+        if not path:
+            return
+        if len(path) == 1:
+            node[path[0]] = {}
+            return
+        if path[0] not in node:
+            node[path[0]] = {}
+        self._replace_in_tree(node[path[0]], path[1:])
+
+    def build_reference_tree(self):
+        tree = {}
+
+        if self.type == CodeBlockType.MODULE:
+            return tree
+
+        if self.type == CodeBlockType.CLASS:
+            references = [self._fix_reference_path(reference) for reference in self.get_all_references(exclude_types=[CodeBlockType.FUNCTION, CodeBlockType.TEST_CASE]) if
+                          reference and reference.scope != ReferenceScope.EXTERNAL]  # FIXME skip _fix_reference_path?
         else:
-            child_code = "".join([child.to_string() for child in self.children])
+            references = [self._fix_reference_path(reference) for reference in self.get_all_references() if
+                          reference and reference.scope != ReferenceScope.EXTERNAL]  # FIXME skip _fix_reference_path?
 
+        for ref in references:
+            self._insert_into_tree(tree, ref.path)
+        return tree
+
+    def build_external_reference_tree(self):
+        tree = {}
+
+        references = [self._fix_reference_path(reference) for reference in self.get_all_references() if
+                      reference is not None and reference.scope != ReferenceScope.EXTERNAL]
+        for ref in references:
+            external_path = tuple(ref.external_path)
+            if external_path not in tree:
+                tree[external_path] = {}
+
+            self._insert_into_tree(tree[external_path], ref.path)
+        return tree
+
+    def _to_context_string(self,
+                           path_tree: dict = None,
+                           show_commented_out_code_comment: bool = True,
+                           exclude_types: List[CodeBlockType] = None) -> str:
         if self.pre_lines:
-            content = "\n" * (self.pre_lines - 1)
+            contents = "\n" * (self.pre_lines - 1)
             for line in self.content_lines:
                 if line:
-                    content += "\n" + self.indentation + line
+                    contents += "\n" + self.indentation + line
                 else:
-                    content += "\n"
+                    contents += "\n"
         else:
-            content = self.pre_code + self.content
+            contents = self.pre_code + self.content
 
-        return f"{content}{child_code}"
+        # assume invalid reference in path_tree if there are no child blocks with an identifier
+        if path_tree and any(child.identifier for child in self.children):
+            outcommented_types = set()
+            for child in self.children:
+                reference_match = any(ref.identifier in path_tree for ref in child.references)
+                if reference_match or child.identifier in path_tree:
+                    if show_commented_out_code_comment and outcommented_types:
+                        # TODO: print by type
+                        contents += child.create_commented_out_block()._to_context_string()
+                        outcommented_types.clear()
+                    contents += child._to_context_string(
+                        path_tree=path_tree.get(child.identifier, None),
+                        show_commented_out_code_comment=show_commented_out_code_comment,
+                        exclude_types=exclude_types)
+                else:
+                    outcommented_types.add(child.type)
+
+            if show_commented_out_code_comment and outcommented_types and child:
+                # TODO: print by type
+                contents += child.create_commented_out_block()._to_context_string()
+        else:
+            contents += "".join([
+                child._to_context_string(
+                    exclude_types=exclude_types,
+                    show_commented_out_code_comment=show_commented_out_code_comment)
+                for child in self.children
+                if not exclude_types or child.type not in exclude_types])
+
+        return contents
+
+    # TODO: Move to Module sub class
+    def to_string_with_blocks(self, block_paths: List[str], include_references: bool) -> str:
+        path_tree = {}
+
+        if self.parent:
+            raise ValueError("Cannot call to_string_with_blocks on non root block.")
+
+        for block_path in block_paths:
+            if block_path:
+                path = block_path.split(".")
+
+                block = self.find_by_path(path)
+                if block and include_references:
+                    if self.type == CodeBlockType.CLASS:
+                        references = [self._fix_reference_path(reference) for reference in self.get_all_references(
+                            exclude_types=[CodeBlockType.FUNCTION, CodeBlockType.TEST_CASE]) if
+                                      reference and reference.scope != ReferenceScope.EXTERNAL]  # FIXME skip _fix_reference_path?
+                    else:
+                        references = [self._fix_reference_path(reference) for reference in self.get_all_references() if
+                                      reference and reference.scope != ReferenceScope.EXTERNAL]  # FIXME skip _fix_reference_path?
+
+                    for ref in references:
+                        self._insert_into_tree(path_tree, ref.path)
+
+                self._replace_in_tree(path_tree, path)
+
+        exclude_types = [CodeBlockType.FUNCTION, CodeBlockType.CLASS, CodeBlockType.TEST_SUITE, CodeBlockType.TEST_CASE]
+        return self._to_context_string(path_tree, show_commented_out_code_comment=True, exclude_types=exclude_types)
+
+    def to_context_string(self,
+                          include_references: bool = False,
+                          show_commented_out_code_comment: bool = True,
+                          max_tokens: int = 0) -> str:
+        path_tree = {}
+        if include_references:
+            path_tree = self.build_reference_tree()
+
+        exclude_types = [CodeBlockType.FUNCTION, CodeBlockType.CLASS, CodeBlockType.TEST_SUITE, CodeBlockType.TEST_CASE]
+        self._replace_in_tree(path_tree, self.full_path())
+        content = self.root()._to_context_string(path_tree, show_commented_out_code_comment=show_commented_out_code_comment, exclude_types=exclude_types)
+
+        if include_references and 0 < max_tokens < count_tokens(content):
+            path_tree = {}
+            self._replace_in_tree(path_tree, self.full_path())
+            content = self.root()._to_context_string(path_tree, show_commented_out_code_comment=show_commented_out_code_comment, exclude_types=exclude_types)
+
+        return content
 
     def to_tree(self,
                 indent: int = 0,
                 only_identifiers: bool = True,
                 show_tokens: bool = False,
-                include_tree_sitter_type: bool = False,
+                debug: bool = False,
                 include_types: List[CodeBlockType] = None,
-                include_merge_history: bool = False):
+                include_parameters: bool = False,
+                include_block_delimiters: bool = False,
+                include_references: bool = False,
+                include_merge_history: bool = False,
+                color: bool = False):
+
+        if not include_merge_history and self.type == CodeBlockType.BLOCK_DELIMITER:
+            return ""
 
         child_tree = "".join([
             child.to_tree(indent=indent + 1,
                           only_identifiers=only_identifiers,
-                          include_tree_sitter_type=include_tree_sitter_type,
+                          debug=debug,
                           include_types=include_types,
                           include_merge_history=include_merge_history,
+                          include_parameters=include_parameters,
+                          include_references=include_references,
+                          include_block_delimiters=include_block_delimiters,
                           show_tokens=show_tokens)
             for child in self.children if not include_types or child.type in include_types])
         indent_str = " " * indent
 
         extra = ""
-        if include_tree_sitter_type and self.tree_sitter_type:
-            extra = f" ({self.tree_sitter_type})"
-
         if show_tokens:
             tokens = utils.count_tokens(str(self))
             extra += f" ({tokens} tokens)"
 
-        content = self.content.strip().replace("\n", "\\n") or ""
+        if include_references and self.references:
+            extra += " references: " + ", ".join([str(ref) for ref in self.references])
 
-        if only_identifiers:
-            content = self.identifier or content
+        content = Colors.YELLOW + (self.content.strip().replace("\n", "\\n") or "") + Colors.RESET
+
+        if only_identifiers and self.identifier:
+            content = Colors.GREEN
+            if include_parameters and self.parameters:
+                content += f"{self.identifier}({', '.join([param.identifier for param in self.parameters])})"
+            else:
+                content += self.identifier
+
+            content += Colors.RESET
+
+        if debug and self.properties:
+            extra += f" properties: {self.properties}"
 
         if include_merge_history and self.merge_history:
-            extra += "merge_history: " + ", ".join([str(action) for action in self.merge_history])
+            extra += " merge_history: " + ", ".join([str(action) for action in self.merge_history])
 
-        return f"{indent_str} {indent} {self.type.value} `{content}`{extra}\n{child_tree}"
+        return f"{indent_str} {indent} {Colors.BLUE}{self.type.value}{Colors.RESET} `{content}`{extra}\n{child_tree}"
 
     def __eq__(self, other):
         if not isinstance(other, CodeBlock):
             return False
         return self.to_dict() == other.to_dict()
 
+    def dict(self, **kwargs):
+        # TODO: Add **kwargs to dict call
+        return super().dict(exclude={"parent", "merge_history"})
+
+    # TODO: Remove
     def to_dict(self):
         return {
             "code": self.content,
@@ -207,15 +464,79 @@ class CodeBlock:
             "children": [child.to_dict() for child in self.children]
         }
 
-    def get_full_identifier(self):
+    def path_string(self):
+        return ".".join(self.full_path())
+
+    def full_path(self):
+        path = []
         if self.parent:
-            return f"{self.parent.get_full_identifier()}/{self.identifier}"
-        return self.identifier
+            path.extend(self.parent.full_path())
+
+        if self.identifier:
+            path.append(re.sub(r"[/. ]", "-", self.identifier))
+        elif self.parent:
+            path.append(str(self.type.value.lower()))
+
+        return path
 
     def root(self):
         if self.parent:
             return self.parent.root()
         return self
+
+    def get_blocks(self, has_identifier: bool, include_types: List[CodeBlockType] = None) -> List["CodeBlock"]:
+        blocks = [self]
+        for child in self.children:
+            if has_identifier and not child.identifier:
+                continue
+
+            if include_types and child.type not in include_types:
+                continue
+
+            blocks.extend(child.get_indexable_blocks())
+        return blocks
+
+    def find_reference(self, ref_path: [str]) -> Optional[Relationship]:
+        for child in self.children:
+            if child.type == CodeBlockType.IMPORT:
+                for reference in child.references:
+                    if reference.path[len(reference.path) - len(ref_path):] == ref_path:
+                        return reference
+
+            child_path = child.full_path()
+
+            if child_path[len(child_path) - len(ref_path):] == ref_path:
+                if self.type == CodeBlockType.CLASS:
+                    return Relationship(scope=ReferenceScope.CLASS, path=child_path)
+                if self.type == CodeBlockType.MODULE:
+                    return Relationship(scope=ReferenceScope.GLOBAL, path=child_path)
+
+                return Relationship(scope=ReferenceScope.LOCAL, path=child_path)
+
+        if self.parent:
+            reference = self.parent.find_reference(ref_path)
+            if reference:
+                return reference
+
+        return None
+
+    def get_all_references(self, exclude_types: List[CodeBlockType] =[]) -> List[Relationship]:
+        references = []
+        references.extend(self.references)
+        for childblock in self.children:
+            if not exclude_types or childblock.type not in exclude_types:
+                references.extend(childblock.get_all_references(exclude_types=exclude_types))
+
+        return references
+
+    def _fix_reference_path(self, reference: Relationship):
+        if reference.scope == ReferenceScope.CLASS:
+            if self.type == CodeBlockType.CLASS:
+                return Relationship(scope=reference.scope, path=[self.identifier] + reference.path)
+            elif self.parent:
+                return self.parent._fix_reference_path(reference)
+
+        return reference
 
     def is_complete(self):
         if self.type == CodeBlockType.COMMENTED_OUT_CODE:
@@ -313,10 +634,23 @@ class CodeBlock:
                     return nested_match
         return None
 
-    def find_blocks_with_identifier(self, other: "CodeBlock") -> List["CodeBlock"]:
+    def find_by_path(self, path: List[str]) -> Optional["CodeBlock"]:
+        if not path:
+            return None
+
+        for child in self.children:
+            if child.identifier == path[0]:
+                if len(path) == 1:
+                    return child
+                else:
+                    return child.find_by_path(path[1:])
+
+        return None
+
+    def find_blocks_with_identifier(self, identifier: str) -> List["CodeBlock"]:
         blocks = []
         for child_block in self.children:
-            if child_block.identifier and other.identifier and child_block.identifier == other.identifier:
+            if child_block.identifier and identifier and child_block.identifier == identifier:
                 blocks.append(child_block)
         return blocks
 
@@ -442,7 +776,7 @@ class CodeBlock:
         for child_block in other_block.children:
             if child_block.type in NON_CODE_BLOCKS:
                 continue
-            matching_children = self.find_blocks_with_identifier(child_block)
+            matching_children = self.find_blocks_with_identifier(child_block.identifier)
             if len(matching_children) == 1:
                 logging.debug(f"Found matching child block `{child_block.identifier}` in `{self.identifier}`")
                 matching_pairs.append((matching_children[0], child_block))
@@ -677,27 +1011,17 @@ class CodeBlock:
 
         return trimmed_block
 
-    def split_blocks(self) -> List["CodeBlock"]:
-        exclude_types = []
-        if self.type in [CodeBlockType.CLASS, CodeBlockType.MODULE]:
-            exclude_types = [CodeBlockType.FUNCTION]
-
-        if self.type == CodeBlockType.TEST_SUITE:
-            exclude_types = [CodeBlockType.TEST_CASE]
-
-        trimmed_block = self.trim(
-            first_level_types=[CodeBlockType.CLASS, CodeBlockType.TEST_SUITE],
-            exclude_types=exclude_types,
-            keep_the_rest=True
-        )
-        trimmed_block = trimmed_block.copy_with_trimmed_parents()
-        trimmed_blocks = [trimmed_block]
-
+    def get_indexable_blocks(self) -> List["CodeBlock"]:
+        """
+        Returns a list of blocks that can be indexed.
+        """
+        splitted_blocks = []
+        splitted_blocks.append(self)
         for child in self.children:
-            if child.type in exclude_types + [CodeBlockType.CLASS, CodeBlockType.TEST_SUITE]:
-                trimmed_blocks.extend(child.split_blocks())
+            if child.type in [CodeBlockType.CLASS, CodeBlockType.FUNCTION, CodeBlockType.CONSTRUCTOR, CodeBlockType.TEST_SUITE, CodeBlockType.TEST_CASE]:
+                splitted_blocks.extend(child.get_indexable_blocks())
 
-        return trimmed_blocks
+        return splitted_blocks
 
     def trim(self,
              keep_blocks: List["CodeBlock"] = [],
@@ -764,4 +1088,3 @@ class CodeBlock:
             parent=self.parent,
             children=children
         )
-

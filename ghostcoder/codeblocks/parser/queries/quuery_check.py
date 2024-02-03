@@ -9,61 +9,106 @@ def print_node(node, indent=""):
     for child in node.children:
         print_node(child, indent + " ")
 
+def run_query(language, query, content):
+    content_in_bytes = bytes(content, "utf8")
+    tree_parser = tree_sitter_languages.get_parser(language)
+    language = get_language(language)
+
+    tree = tree_parser.parse(content_in_bytes)
+
+    print_node(tree.root_node)
+
+    current_node = tree.root_node.children[0]
+
+    query = language.query(query)
+    captures = query.captures(tree.root_node)
+
+    print(captures)
+    captures = list(captures)
+
+    for node, tag in captures:
+        print(tag + ": " + str(node) + " \"" + node.text.decode("utf8") + "\"")
+
+content = """class FooForm extends Component {
+    isContactFormValid = () =>
+        isValidPhone(this.state.mobileNumber) && this.validEmail(this.state.email);
+}"""
+
 content = """
-import java.utils;
+export const useDeleteUser = ({ config }: UseDeleteUserOptions = {}) => {
+  const { addNotification } = useNotificationStore();
 
-public class TreeSitterTypes implements ExampleInterface {
-
-    // This is a single line comment.
-
-    private int value;
-
-    public static String CONSTANT = "foo"
-
-    public TreeSitterTypes(int value) {
-        if (value == 5) {
-            System.out.println("Five");
-        } else if (value == 6) {
-            System.out.println("Six");
-        } else {
-            System.out.println("Other");
-        }
-
-        try (AutoCloseable ac = () -> {}) {
-            System.out.println("In try");
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            System.out.println("In finally");
-        }
+  return useMutation({
+    onMutate: async (deletedUser) => {
+      await queryClient.cancelQueries('users');
+      return { previousUsers };
     }
+  });
+};"""
 
 
-
-}
-
+t_query = """
+(lexical_declaration
+  (variable_declarator
+    name: [
+      (identifier) @identifier
+      (array_pattern) @identifier
+    ]
+    value: [
+      (arrow_function
+        parameters: (formal_parameters
+          ("(")
+          (
+            (identifier) @parameter.identifier
+            (",")?
+          )*
+          (")")
+        ) @definition.function
+        body: [
+          (statement_block
+            ("{") @child.first
+          )
+          (expression) @child.first
+          (parenthesized_expression
+            ("(") @child.first
+          )
+        ]
+      )
+      (call_expression
+        (arguments
+          (arrow_function
+            (formal_parameters
+              ("(")
+              (
+                (identifier) @reference.identifier
+                (",")?
+              )*
+              (")")
+            )?
+            [
+              (statement_block
+                ("{") @child.first @definition.block
+              )
+              (parenthesized_expression
+                ("(") @child.first  @definition.block
+              )
+            ]
+          )
+        )
+      )
+    ]
+  )
+) @root
 """
 
-content_in_bytes = bytes(content, "utf8")
-tree_parser = tree_sitter_languages.get_parser("java")
-language = get_language("java")
+content = """
+export const getUsers = (): Promise<User[]> => {
+  return axios.get(`/users`);
+};
+"""
 
-tree = tree_parser.parse(content_in_bytes)
-
-print_node(tree.root_node)
-
-current_node = tree.root_node.children[0]
-
-query_scm = Path("/home/albert/repos/albert/ghostcoder/ghostcoder/codeblocks/parser/queries/java.scm")
-
+query_scm = Path("/home/albert/repos/albert/ghostcoder/ghostcoder/codeblocks/parser/queries/javascript.scm")
 t_query = query_scm.read_text()
 
 
-query = language.query(t_query)
-captures = query.captures(tree.root_node)
-
-print(captures)
-captures = list(captures)
-
-for node, tag in captures:
-    print(tag + ": " + node.type + " \"" + node.text.decode("utf8") + "\"")
+run_query("tsx", t_query, content)
