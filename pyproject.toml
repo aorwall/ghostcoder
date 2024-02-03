@@ -7,13 +7,13 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.12"
-openai==1.6.1
+openai = "1.6.1"
 #langchain = "^0.0.344"
-pydantic==1.10.13
+pydantic = "1.10.13"
 #pathspec = "^0.11.1"
 #gitpython = "^3.1.31
-tiktoken==0.5.2
-tree-sitter-languages==1.9.1
+tiktoken = "0.5.2"
+tree-sitter-languages = "1.9.1"
 #llama-index = "^0.9.10"
 #streamlit = "^1.28.1"
 #chromadb = "^0.4.18"
