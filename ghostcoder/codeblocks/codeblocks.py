@@ -373,13 +373,21 @@ class CodeBlock(BaseModel):
     def to_context_string(self,
                           include_references: bool = False,
                           show_commented_out_code_comment: bool = True,
-                          max_tokens: int = 0) -> str:
+                          exclude_types=[CodeBlockType.FUNCTION, CodeBlockType.CLASS, CodeBlockType.TEST_SUITE, CodeBlockType.TEST_CASE],
+                          max_tokens: int = 0,
+                          min_tokens: int = None) -> str:
         path_tree = {}
         if include_references:
             path_tree = self.build_reference_tree()
 
-        exclude_types = [CodeBlockType.FUNCTION, CodeBlockType.CLASS, CodeBlockType.TEST_SUITE, CodeBlockType.TEST_CASE]
         self._replace_in_tree(path_tree, self.full_path())
+        if min_tokens:
+            content = self.root()._to_context_string(path_tree,
+                                                     show_commented_out_code_comment=show_commented_out_code_comment,
+                                                     exclude_types=[])
+            if min_tokens > count_tokens(content):
+                return content
+
         content = self.root()._to_context_string(path_tree, show_commented_out_code_comment=show_commented_out_code_comment, exclude_types=exclude_types)
 
         if include_references and 0 < max_tokens < count_tokens(content):
@@ -473,7 +481,7 @@ class CodeBlock(BaseModel):
             path.extend(self.parent.full_path())
 
         if self.identifier:
-            path.append(re.sub(r"[/. ]", "-", self.identifier))
+            path.append(self.identifier)
         elif self.parent:
             path.append(str(self.type.value.lower()))
 
@@ -484,8 +492,14 @@ class CodeBlock(BaseModel):
             return self.parent.root()
         return self
 
-    def get_blocks(self, has_identifier: bool, include_types: List[CodeBlockType] = None) -> List["CodeBlock"]:
+    def get_blocks(self, has_identifier: bool, include_types: List[CodeBlockType] = None, min_tokens: int = 0, max_tokens: int = 0) -> List["CodeBlock"]:
         blocks = [self]
+
+        if min_tokens:
+            tokens = count_tokens(self.to_string())
+            if tokens < min_tokens:
+                return blocks
+
         for child in self.children:
             if has_identifier and not child.identifier:
                 continue
@@ -1017,9 +1031,11 @@ class CodeBlock(BaseModel):
         """
         splitted_blocks = []
         splitted_blocks.append(self)
-        for child in self.children:
-            if child.type in [CodeBlockType.CLASS, CodeBlockType.FUNCTION, CodeBlockType.CONSTRUCTOR, CodeBlockType.TEST_SUITE, CodeBlockType.TEST_CASE]:
-                splitted_blocks.extend(child.get_indexable_blocks())
+
+        if self.type in [CodeBlockType.CLASS, CodeBlockType.TEST_SUITE, CodeBlockType.MODULE]:
+            for child in self.children:
+                if child.type in [CodeBlockType.CLASS, CodeBlockType.FUNCTION, CodeBlockType.CONSTRUCTOR, CodeBlockType.TEST_SUITE, CodeBlockType.TEST_CASE]:
+                    splitted_blocks.extend(child.get_indexable_blocks())
 
         return splitted_blocks
 
