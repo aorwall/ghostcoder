@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 ROLE_PROMPT = "You are autonomous AI assisistant with superior programming skills."
 
-MAIN_OBJECTIVE_PROMPT = "The main objective is to solve a bigger task specfied by the user, this is wrapped in a <main_objective> tag."
+MAIN_OBJECTIVE_PROMPT = "The main objective is to solve a bigger task specified by the user, this is wrapped in a <main_objective> tag."
 
 SEARCH_REPLACE_PROMPT = """Your task is to solve a smaller task within the main objective. This task is wrapped in a <task> tag.
 
